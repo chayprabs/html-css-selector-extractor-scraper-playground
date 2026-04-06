@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef, useState, useCallback } from "react";
 import { LIMITS, type LimitViolation } from "@/lib/limits";
 import type { ProcessingState } from "@/types/processing";
 
@@ -11,24 +12,42 @@ type SelectorBarProps = {
   onClear: () => void;
   violations?: LimitViolation[];
   processingState?: ProcessingState;
+  showCopyLink?: boolean;
+  onToggleHistory?: () => void;
+  historyCount?: number;
 };
 
 /**
  * Full-width top bar with CSS selector input, match count badge, and clear button.
  * Purple left border when focused, red border + error message on invalid selector.
  */
-export default function SelectorBar({
-  selector,
-  onSelectorChange,
-  matchCount,
-  error,
-  onClear,
-  violations,
-  processingState,
-}: SelectorBarProps) {
+const SelectorBar = forwardRef<HTMLInputElement, SelectorBarProps>(function SelectorBar(
+  {
+    selector,
+    onSelectorChange,
+    matchCount,
+    error,
+    onClear,
+    violations,
+    processingState,
+    showCopyLink,
+    onToggleHistory,
+    historyCount,
+  },
+  ref,
+) {
   const blockViolation = violations?.find((v) => v.severity === "block");
   const warnViolation = violations?.find((v) => v.severity === "warn");
   const hasError = !!error || !!blockViolation;
+
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }, []);
 
   return (
     <div className="w-full bg-[#141414] border-b border-[#222] px-4 py-3">
@@ -36,6 +55,7 @@ export default function SelectorBar({
         {/* Selector input */}
         <div className="flex-1 relative">
           <input
+            ref={ref}
             type="text"
             value={selector}
             onChange={(e) => onSelectorChange(e.target.value)}
@@ -88,6 +108,38 @@ export default function SelectorBar({
           </div>
         )}
 
+        {/* Copy link button */}
+        {showCopyLink && selector.length > 0 && (
+          <button
+            onClick={handleCopyLink}
+            title="Share this selector configuration"
+            className={`px-3 py-1.5 text-xs border rounded transition-colors whitespace-nowrap ${
+              linkCopied
+                ? "bg-green-950/60 text-green-400 border-green-500/30"
+                : "bg-[#1e1e1e] text-[#888] border-[#333] hover:text-[#ccc] hover:border-[#555]"
+            }`}
+          >
+            {linkCopied ? "Copied!" : "Copy link"}
+          </button>
+        )}
+
+        {/* History toggle button */}
+        {onToggleHistory && (
+          <button
+            onClick={onToggleHistory}
+            title="Toggle history panel"
+            className="px-2.5 py-1.5 text-xs bg-[#1e1e1e] text-[#888] border border-[#333] rounded hover:text-[#ccc] hover:border-[#555] transition-colors flex items-center gap-1.5"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            {typeof historyCount === "number" && historyCount > 0 && (
+              <span className="text-[#a78bfa]">{historyCount}</span>
+            )}
+          </button>
+        )}
+
         {/* Clear button */}
         <button
           onClick={onClear}
@@ -99,4 +151,6 @@ export default function SelectorBar({
       </div>
     </div>
   );
-}
+});
+
+export default SelectorBar;

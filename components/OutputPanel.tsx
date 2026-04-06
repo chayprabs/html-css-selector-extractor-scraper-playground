@@ -1,23 +1,28 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import CopyButton from "./CopyButton";
 import MatchCard from "./MatchCard";
 import type { ExtractorOutput } from "@/lib/extractor";
 import type { ProcessingState } from "@/types/processing";
+import { exportAsJson, exportAsCsv, exportAsText } from "@/lib/exporters";
 
 type OutputPanelProps = {
   output: ExtractorOutput | null;
   /** Which display mode to use, derived from active options */
   mode: "html" | "text" | "attribute" | "pretty";
   processingState: ProcessingState;
+  attributeName?: string;
 };
 
 /**
  * Right panel: renders matched results as a scrollable list of MatchCards.
  * Shows empty state, no-matches state, processing indicator, timeout/error messages, or results.
  */
-export default function OutputPanel({ output, mode, processingState }: OutputPanelProps) {
+export default function OutputPanel({ output, mode, processingState, attributeName }: OutputPanelProps) {
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
   // Compute the "copy all" text by joining all visible results
   const allText = useMemo(() => {
     if (!output) return "";
@@ -37,6 +42,51 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
       .join("\n\n");
   }, [output, mode]);
 
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExportOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [exportOpen]);
+
+  const exportMode = mode === "pretty" ? "html" : mode === "attribute" ? "attribute" : mode === "text" ? "text" : "html";
+
+  const handleExport = (format: "json" | "csv" | "txt") => {
+    if (!output) return;
+    const opts = {
+      mode: exportMode as "html" | "text" | "attribute",
+      attributeName: attributeName || undefined,
+      includeIndex: true,
+    };
+    switch (format) {
+      case "json":
+        exportAsJson(output.matches, opts);
+        break;
+      case "csv":
+        exportAsCsv(output.matches, opts);
+        break;
+      case "txt":
+        exportAsText(output.matches, opts);
+        break;
+    }
+    setExportOpen(false);
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#141414] rounded-lg border border-[#222] overflow-hidden">
       {/* Header */}
@@ -51,9 +101,48 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
             </span>
           )}
         </div>
-        {output && output.matches.length > 0 && (
-          <CopyButton text={allText} label="Copy all" />
-        )}
+        <div className="flex items-center gap-2">
+          {/* Export dropdown */}
+          {output && output.matches.length > 0 && (
+            <div ref={exportRef} className="relative">
+              <button
+                onClick={() => setExportOpen(!exportOpen)}
+                aria-expanded={exportOpen}
+                className="px-2.5 py-1 text-xs bg-[#1e1e1e] text-[#888] border border-[#333] rounded hover:text-[#ccc] hover:border-[#555] transition-colors"
+              >
+                Export &#x25BE;
+              </button>
+              {exportOpen && (
+                <div role="menu" className="absolute right-0 top-full mt-1 w-40 bg-[#1a1a1a] border border-[#333] rounded-lg overflow-hidden z-50">
+                  <button
+                    role="menuitem"
+                    onClick={() => handleExport("json")}
+                    className="w-full text-left px-3 py-2 text-xs text-[#e5e5e5] hover:bg-[#252525] transition-colors border-b border-[#222]"
+                  >
+                    Download JSON
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => handleExport("csv")}
+                    className="w-full text-left px-3 py-2 text-xs text-[#e5e5e5] hover:bg-[#252525] transition-colors border-b border-[#222]"
+                  >
+                    Download CSV
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => handleExport("txt")}
+                    className="w-full text-left px-3 py-2 text-xs text-[#e5e5e5] hover:bg-[#252525] transition-colors"
+                  >
+                    Download TXT
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {output && output.matches.length > 0 && (
+            <CopyButton text={allText} label="Copy all" />
+          )}
+        </div>
       </div>
 
       {/* Content area */}

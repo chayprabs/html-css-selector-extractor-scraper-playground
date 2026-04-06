@@ -10,7 +10,7 @@ type CopyButtonProps = {
 
 /**
  * Reusable copy-to-clipboard button with visual feedback.
- * Shows "Copied!" for 1.5s after successful copy.
+ * Shows "Copied!" for 2s after successful copy.
  */
 export default function CopyButton({ text, label = "Copy", className = "" }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
@@ -26,7 +26,7 @@ export default function CopyButton({ text, label = "Copy", className = "" }: Cop
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 1500);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
     });
   }, [text]);
 

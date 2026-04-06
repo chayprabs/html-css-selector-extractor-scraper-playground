@@ -14,7 +14,7 @@
  */
 
 import { LIMITS, formatBytes } from "./limits";
-import { validateRemoveNodesCount } from "./validators";
+import { validateRemoveNodesCount, validateParsedDocument } from "./validators";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -75,6 +75,16 @@ export async function runExtractor(input: ExtractorInput): Promise<ExtractorOutp
   const doc = parsedDoc
     ? parsedDoc.cloneNode(true) as Document
     : parseHtml(html);
+
+  // Validate parsed document structure (element count, nesting depth, attribute sizes)
+  const docValidation = validateParsedDocument(doc);
+  if (!docValidation.valid) {
+    return {
+      matches: [],
+      matchCount: 0,
+      error: docValidation.violation?.message,
+    };
+  }
 
   // Step 1: Remove nodes before running the main selector
   if (removeNodes && removeNodes.trim()) {

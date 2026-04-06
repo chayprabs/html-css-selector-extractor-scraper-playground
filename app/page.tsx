@@ -9,13 +9,17 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import SelectorBar from "@/components/SelectorBar";
 import HtmlInput from "@/components/HtmlInput";
-import ControlPanel, { type ExtractorOptions, defaultOptions } from "@/components/ControlPanel";
+import ControlPanel from "@/components/ControlPanel";
 import OutputPanel from "@/components/OutputPanel";
+import HistoryPanel from "@/components/HistoryPanel";
+import ShortcutsHelp from "@/components/ShortcutsHelp";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import type { ExtractorOutput } from "@/lib/extractor";
 import { LIMITS, type LimitViolation } from "@/lib/limits";
+import { type ExtractorOptions, defaultOptions } from "@/types/options";
 import {
   validateHtml,
   validateSelector,
@@ -25,6 +29,12 @@ import {
 } from "@/lib/validators";
 import { useExtractorWorker } from "@/lib/useExtractorWorker";
 import { useRateLimiter } from "@/lib/useRateLimiter";
+import { useHistory } from "@/lib/useHistory";
+import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
+import { encodeStateToUrl, decodeStateFromUrl, isStateDefault } from "@/lib/urlState";
+import { exportAsJson } from "@/lib/exporters";
+import { samples } from "@/lib/samples";
+import { clearHistory } from "@/lib/history";
 import type { ProcessingState } from "@/types/processing";
 
 export default function Home() {
@@ -42,11 +52,52 @@ export default function Home() {
   const [removeNodesViolations, setRemoveNodesViolations] = useState<LimitViolation[]>([]);
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
 
+  // UI state
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rateLimitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hydratedRef = useRef(false);
+  const selectorInputRef = useRef<HTMLInputElement>(null);
 
   const { runExtraction } = useExtractorWorker();
   const { checkLimit, reset: resetRateLimit } = useRateLimiter(LIMITS.ENGINE_MAX_RUNS_PER_MINUTE);
+  const { entries: historyEntries, addEntry: addHistoryEntry, deleteEntry: deleteHistoryEntry, clearAll: clearAllHistory } = useHistory();
+
+  // ─── URL hydration on mount ─────────────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const { selector: s, options: opts } = decodeStateFromUrl(window.location.search);
+    if (s) setSelector(s);
+    if (Object.keys(opts).length > 0) {
+      setOptions((prev) => ({ ...prev, ...opts }));
+    }
+    // Mark hydration complete after a tick so the engine effect picks up the new state
+    requestAnimationFrame(() => {
+      hydratedRef.current = true;
+    });
+  }, []);
+
+  // ─── URL sync (debounced) ───────────────────────────────────
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (typeof window === "undefined") return;
+
+    if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+    urlSyncTimerRef.current = setTimeout(() => {
+      if (isStateDefault(selector, options)) {
+        window.history.replaceState(null, "", window.location.pathname);
+      } else {
+        const newUrl = encodeStateToUrl(selector, options);
+        window.history.replaceState(null, "", newUrl);
+      }
+    }, 1000);
+
+    return () => {
+      if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+    };
+  }, [selector, options]);
 
   // Debounced engine runner
   const runEngine = useCallback(
@@ -174,11 +225,25 @@ export default function Home() {
     runEngine(html, selector, options);
   }, [html, selector, options, runEngine]);
 
+  // ─── Save to history on successful extraction ───────────────
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (processingState !== "done" || !output || output.matchCount === 0) return;
+
+    addHistoryEntry({
+      selector,
+      options,
+      matchCount: output.matchCount,
+      htmlPreview: html.slice(0, 100),
+    });
+  }, [processingState, output]); // intentionally omit selector/options/html/addHistoryEntry to only fire on state transitions
+
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (rateLimitTimerRef.current) clearTimeout(rateLimitTimerRef.current);
+      if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
   }, []);
 
@@ -210,8 +275,95 @@ export default function Home() {
   // Match count for the badge — null when no query has been run
   const matchCount = output ? output.matchCount : null;
 
+  // Copy link visibility
+  const showCopyLink = !isStateDefault(selector, options);
+
+  // ─── Compute "copy all" text for keyboard shortcut ──────────
+  const allText = useMemo(() => {
+    if (!output) return "";
+    return output.matches
+      .map((m) => {
+        switch (displayMode) {
+          case "attribute":
+            return m.attribute ?? "";
+          case "text":
+            return m.text;
+          case "pretty":
+            return m.pretty ?? m.raw;
+          default:
+            return m.raw;
+        }
+      })
+      .join("\n\n");
+  }, [output, displayMode]);
+
+  // ─── History handlers ───────────────────────────────────────
+  const handleLoadHistory = useCallback(
+    (entry: { selector: string; options: ExtractorOptions }) => {
+      setSelector(entry.selector);
+      setOptions(entry.options);
+      setHistoryOpen(false);
+    },
+    [],
+  );
+
+  // ─── Toast for copy feedback ────────────────────────────────
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2000);
+  }, []);
+
+  // ─── Keyboard shortcuts ─────────────────────────────────────
+  useKeyboardShortcuts({
+    focusSelector: () => selectorInputRef.current?.focus(),
+    copyResults: () => {
+      if (!allText) return;
+      navigator.clipboard.writeText(allText).then(() => {
+        showToast(`Copied ${output?.matches.length ?? 0} results`);
+      });
+    },
+    clearHtml: () => {
+      setHtml("");
+    },
+    toggleHistory: () => setHistoryOpen((prev) => !prev),
+    exportJson: () => {
+      if (!output || output.matches.length === 0) return;
+      const exportMode = displayMode === "pretty" ? "html" : displayMode === "attribute" ? "attribute" : displayMode === "text" ? "text" : "html";
+      exportAsJson(output.matches, {
+        mode: exportMode as "html" | "text" | "attribute",
+        attributeName: options.attribute || undefined,
+        includeIndex: true,
+      });
+    },
+    escape: () => {
+      if (historyOpen) {
+        setHistoryOpen(false);
+        return;
+      }
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    },
+    loadSample: (index: number) => {
+      if (index >= 0 && index < samples.length) {
+        setHtml(samples[index].html);
+      }
+    },
+  });
+
   return (
     <div className="flex flex-col h-screen bg-[#0d0d0d] overflow-hidden">
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-[#7c3aed] text-white text-xs font-medium rounded-lg shadow-lg">
+          {toast}
+        </div>
+      )}
+
       {/* Rate limit banner */}
       {rateLimitMessage && (
         <div className="px-4 py-2 bg-red-950/60 border-b border-red-500/30 text-xs text-red-400 font-mono text-center">
@@ -221,6 +373,7 @@ export default function Home() {
 
       {/* Top bar — selector input */}
       <SelectorBar
+        ref={selectorInputRef}
         selector={selector}
         onSelectorChange={setSelector}
         matchCount={matchCount}
@@ -228,6 +381,9 @@ export default function Home() {
         onClear={handleClearAll}
         violations={selectorViolations}
         processingState={processingState}
+        showCopyLink={showCopyLink}
+        onToggleHistory={() => setHistoryOpen((prev) => !prev)}
+        historyCount={historyEntries.length}
       />
 
       {/* Three-panel layout */}
@@ -255,13 +411,58 @@ export default function Home() {
 
         {/* Right: output */}
         <div className="lg:flex-1 min-h-[300px] lg:h-full">
-          <OutputPanel
-            output={output}
-            mode={displayMode}
-            processingState={processingState}
-          />
+          <ErrorBoundary
+            fallback={
+              <div className="flex flex-col items-center justify-center h-full bg-[#141414] rounded-lg border border-[#222] p-6 text-center">
+                <p className="text-sm text-[#e5e5e5] mb-3">Output panel encountered an error.</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1.5 text-xs bg-[#7c3aed] text-white rounded hover:bg-[#6d28d9] transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
+            }
+          >
+            <OutputPanel
+              output={output}
+              mode={displayMode}
+              processingState={processingState}
+              attributeName={options.attribute}
+            />
+          </ErrorBoundary>
         </div>
       </div>
+
+      {/* History panel */}
+      <ErrorBoundary
+        fallback={
+          <div className="fixed top-0 right-0 h-full w-80 z-50 bg-[#141414] border-l border-[#222] flex items-center justify-center p-6 text-center">
+            <div>
+              <p className="text-sm text-[#e5e5e5] mb-3">History unavailable.</p>
+              <button
+                onClick={() => { clearHistory(); window.location.reload(); }}
+                className="px-3 py-1.5 text-xs bg-[#7c3aed] text-white rounded hover:bg-[#6d28d9] transition-colors"
+              >
+                Clear history and reset
+              </button>
+            </div>
+          </div>
+        }
+        onError={() => clearHistory()}
+      >
+        <HistoryPanel
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          entries={historyEntries}
+          onLoad={handleLoadHistory}
+          onDelete={deleteHistoryEntry}
+          onClear={clearAllHistory}
+        />
+      </ErrorBoundary>
+
+      {/* Keyboard shortcuts help */}
+      <ShortcutsHelp />
     </div>
   );
 }

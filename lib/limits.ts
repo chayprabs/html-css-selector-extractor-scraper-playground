@@ -46,7 +46,7 @@ export const LIMITS = {
   SELECTOR_MAX_LENGTH: 500,                // max selector string length
   SELECTOR_MAX_COMMA_PARTS: 20,            // max comma-separated selector parts
   SELECTOR_MAX_NESTING_DEPTH: 8,           // max descendant combinator depth
-  SELECTOR_TIMEOUT_MS: 2000,               // kill selector eval after 2 seconds
+  SELECTOR_TIMEOUT_MS: 3000,               // kill selector eval after 3 seconds
   SELECTOR_COMPLEXITY_SCORE_MAX: 100,      // computed complexity score ceiling
 
   // ─── Output limits ────────────────────────────────────────────────
