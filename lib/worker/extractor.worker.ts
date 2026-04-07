@@ -6,10 +6,11 @@
  * it gets terminated and a fresh worker is created.
  *
  * Document objects cannot cross the postMessage boundary (not structured-cloneable),
- * so the worker re-parses HTML on every invocation. DOMParser is available in workers.
+ * so the worker parses HTML internally. The parsed document is cached so that
+ * option-only changes (toggling pretty-print, text-only, etc.) skip re-parsing.
  */
 
-import { runExtractor, type ExtractorInput, type ExtractorOutput } from "../extractor";
+import { runExtractor, parseHtml, type ExtractorInput, type ExtractorOutput } from "../extractor";
 
 export type WorkerRequest = {
   id: number;
@@ -22,11 +23,20 @@ export type WorkerResponse = {
   error?: string;
 };
 
+// Cache the last parsed document so option-only changes skip re-parsing
+let cachedHtml: string | null = null;
+let cachedDoc: Document | null = null;
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const { id, input } = e.data;
   try {
-    // parsedDoc is intentionally omitted — worker parses fresh every time
-    const result = await runExtractor(input);
+    // Reuse cached document when HTML hasn't changed
+    if (input.html !== cachedHtml || !cachedDoc) {
+      cachedDoc = parseHtml(input.html);
+      cachedHtml = input.html;
+    }
+
+    const result = await runExtractor({ ...input, parsedDoc: cachedDoc });
     self.postMessage({ id, result } as WorkerResponse);
   } catch (err) {
     self.postMessage({ id, error: String(err) } as WorkerResponse);
