@@ -24,7 +24,6 @@ export function useKeyboardShortcuts(actions: ShortcutActions): void {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       const a = actionsRef.current;
 
-      // Escape — always works
       if (e.key === "Escape") {
         a.escape();
         return;
@@ -32,14 +31,12 @@ export function useKeyboardShortcuts(actions: ShortcutActions): void {
 
       if (!mod) return;
 
-      // Cmd/Ctrl+K — focus selector (works even in input)
       if (e.key === "k" || e.key === "K") {
         e.preventDefault();
         a.focusSelector();
         return;
       }
 
-      // Cmd/Ctrl+Shift combos
       if (e.shiftKey) {
         switch (e.key) {
           case "C":
@@ -65,10 +62,9 @@ export function useKeyboardShortcuts(actions: ShortcutActions): void {
         }
       }
 
-      // Cmd/Ctrl+1,2,3 — load samples
-      if (e.key === "1" || e.key === "2" || e.key === "3") {
+      if (/^[1-8]$/.test(e.key)) {
         e.preventDefault();
-        a.loadSample(parseInt(e.key) - 1);
+        a.loadSample(parseInt(e.key, 10) - 1);
         return;
       }
     };

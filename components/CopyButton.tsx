@@ -10,7 +10,7 @@ type CopyButtonProps = {
 
 /**
  * Reusable copy-to-clipboard button with visual feedback.
- * Shows "Copied!" for 2s after successful copy.
+ * Shows "Copied." for 2s after successful copy (PRD §6.4).
  */
 export default function CopyButton({ text, label = "Copy", className = "" }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
@@ -40,7 +40,7 @@ export default function CopyButton({ text, label = "Copy", className = "" }: Cop
           : "bg-[#1e1e1e] text-[#888] border border-[#333] hover:text-[#ccc] hover:border-[#555]"
       } ${className}`}
     >
-      {copied ? "Copied!" : label}
+      {copied ? "Copied." : label}
     </button>
   );
 }

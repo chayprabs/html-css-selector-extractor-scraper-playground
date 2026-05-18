@@ -1,41 +1,18 @@
+/**
+ * Legacy query-string sharing (?s=&a=&…) retained for backward compatibility (PRD §9 migration).
+ */
+
 import { defaultOptions, type ExtractorOptions } from "@/types/options";
 import {
-  validateSelector,
-  validateAttribute,
+  validateSelectorLength,
+  trySelectorSyntax,
+  validateAttributeName,
   validateBaseUrl,
-  validateRemoveNodesSelector,
+  validateStripSelectorsField,
 } from "./validators";
 
-const PARAM_MAP = {
-  s: "selector",
-  a: "attribute",
-  t: "textOnly",
-  p: "prettyPrint",
-  w: "ignoreWhitespace",
-  r: "removeNodes",
-  b: "baseUrl",
-} as const;
-
-type ParamKey = keyof typeof PARAM_MAP;
-
-const BOOL_FIELDS = new Set(["textOnly", "prettyPrint", "ignoreWhitespace"]);
-
-export function encodeStateToUrl(selector: string, options: ExtractorOptions): string {
-  const params = new URLSearchParams();
-
-  if (selector) params.set("s", selector);
-  if (options.attribute) params.set("a", options.attribute);
-  if (options.textOnly) params.set("t", "1");
-  if (options.prettyPrint) params.set("p", "1");
-  if (options.ignoreWhitespace) params.set("w", "1");
-  if (options.removeNodes) params.set("r", options.removeNodes);
-  if (options.baseUrl) params.set("b", options.baseUrl);
-
-  const qs = params.toString();
-  return window.location.origin + window.location.pathname + (qs ? "?" + qs : "");
-}
-
-export function decodeStateFromUrl(search: string): {
+/** Decode pre-hash legacy URLs into selector + partial options. */
+export function decodeLegacyQueryParams(search: string): {
   selector: string;
   options: Partial<ExtractorOptions>;
 } {
@@ -45,63 +22,88 @@ export function decodeStateFromUrl(search: string): {
   };
 
   try {
-    const params = new URLSearchParams(search);
+    const params = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
 
-    // Selector
     const s = params.get("s");
     if (s) {
-      const v = validateSelector(s);
-      if (!v.violation || v.violation.severity !== "block") {
-        result.selector = s;
+      const len = validateSelectorLength(s);
+      if (len.valid) {
+        const syn = trySelectorSyntax(s);
+        if (!syn) result.selector = s;
       }
     }
 
-    // Attribute
     const a = params.get("a");
-    if (a) {
-      const v = validateAttribute(a);
-      if (!v.violation || v.violation.severity !== "block") {
-        result.options.attribute = a;
+    if (a?.trim()) {
+      const v = validateAttributeName(a);
+      if (v.valid || v.violation?.severity === "warn") {
+        result.options.mode = "attribute";
+        result.options.attributeName = a;
+        result.options.prettyPrint = false;
       }
     }
 
-    // Booleans
-    if (params.has("t")) result.options.textOnly = params.get("t") === "1";
-    if (params.has("p")) result.options.prettyPrint = params.get("p") === "1";
-    if (params.has("w")) result.options.ignoreWhitespace = params.get("w") === "1";
-
-    // Remove nodes
+    const legacyText = params.get("t") === "1";
+    const legacyPretty = params.get("p") === "1";
     const r = params.get("r");
-    if (r) {
-      const v = validateRemoveNodesSelector(r);
-      if (!v.violation || v.violation.severity !== "block") {
-        result.options.removeNodes = r;
+    const b = params.get("b");
+
+    if (legacyText && !a?.trim()) {
+      result.options.mode = "textContent";
+    }
+
+    if (legacyPretty) {
+      if (result.options.mode !== "attribute") {
+        result.options.prettyPrint = true;
+        if (!result.options.mode) result.options.mode = "outerHTML";
       }
     }
 
-    // Base URL
-    const b = params.get("b");
+    if (r) {
+      const v = validateStripSelectorsField(r);
+      if (v.valid || v.violation?.severity === "warn") {
+        result.options.stripSelectors = r;
+      }
+    }
+
     if (b) {
       const v = validateBaseUrl(b);
-      if (!v.violation || v.violation.severity !== "block") {
+      if (v.valid || v.violation?.severity === "warn") {
         result.options.baseUrl = b;
       }
     }
+
+    // Old URLs sometimes implied attribute mode only via `a` (handled above).
+    if (!result.options.mode) {
+      result.options.mode = defaultOptions.mode;
+    }
   } catch {
-    // Malformed URL params — silently ignore
+    /* ignore */
   }
 
   return result;
 }
 
-export function isStateDefault(selector: string, options: ExtractorOptions): boolean {
-  if (selector) return false;
+export function mergeDecodedOptions(partial: Partial<ExtractorOptions>): ExtractorOptions {
+  return {
+    ...defaultOptions,
+    ...partial,
+    mode: partial.mode ?? defaultOptions.mode,
+    attributeName: partial.attributeName ?? defaultOptions.attributeName,
+    stripSelectors: partial.stripSelectors ?? defaultOptions.stripSelectors,
+    baseUrl: partial.baseUrl ?? defaultOptions.baseUrl,
+    prettyPrint: partial.prettyPrint ?? defaultOptions.prettyPrint,
+  };
+}
+
+export function isWorkspaceVisiblyEmpty(html: string, selector: string, options: ExtractorOptions): boolean {
+  if (html.trim() !== "") return false;
+  if (selector.trim() !== "") return false;
   return (
-    options.textOnly === defaultOptions.textOnly &&
-    options.prettyPrint === defaultOptions.prettyPrint &&
-    options.ignoreWhitespace === defaultOptions.ignoreWhitespace &&
-    options.attribute === defaultOptions.attribute &&
-    options.removeNodes === defaultOptions.removeNodes &&
-    options.baseUrl === defaultOptions.baseUrl
+    options.mode === defaultOptions.mode &&
+    options.attributeName === defaultOptions.attributeName &&
+    options.stripSelectors === defaultOptions.stripSelectors &&
+    options.baseUrl === defaultOptions.baseUrl &&
+    options.prettyPrint === defaultOptions.prettyPrint
   );
 }

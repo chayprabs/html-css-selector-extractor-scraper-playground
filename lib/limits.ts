@@ -1,82 +1,38 @@
 /**
- * Rate limiting & abuse prevention — single source of truth for all limits.
- *
- * ATTACK SURFACE MAP:
- *
- * Input 1: HTML textarea (HtmlInput.tsx)
- *   → Size attacks (50MB paste freezes DOMParser)
- *   → Deep nesting (100k levels overflows call stack during traversal)
- *   → Element count (1M elements matching selector freezes results loop)
- *   → Large attribute values (10MB single attr value)
- *   → Entity bombs (&amp; x100,000)
- *   → Null bytes (\x00)
- *
- * Input 2: CSS selector (SelectorBar.tsx)
- *   → Pathological selectors (deeply nested descendants, nested :not(), universal + nth-child)
- *   → Long selector strings (10,000 chars)
- *   → Thousands of comma-separated parts
- *   → Selector complexity causing querySelectorAll to hang 30+ seconds
- *
- * Input 3: Attribute flag (ControlPanel.tsx)
- *   → Invalid characters / injection attempts
- *   → Event handler names (on*) extracting executable code
- *   → Extremely long attribute names
- *
- * Input 4: RemoveNodes selector (ControlPanel.tsx)
- *   → Same as CSS selector attacks
- *   → Mass removal (10k+ elements causing DOM thrashing)
- *
- * Input 5: Base URL (ControlPanel.tsx)
- *   → javascript: / data: / vbscript: / file: / blob: scheme injection
- *   → Extremely long URL strings
- *   → Private/internal URL probing
- *
- * Input 6: Sample loader (SampleLoader.tsx)
- *   → Controlled (hardcoded samples) — low risk, verified at build time
+ * Limits aligned with PRD §12 / §19 (plus defensive DOM guards).
  */
 
 export const LIMITS = {
-  // ─── Input size limits ─────────────────────────────────────────────
-  HTML_MAX_BYTES: 2 * 1024 * 1024,        // 2MB max HTML input
-  HTML_MAX_ELEMENTS: 50_000,               // max elements in parsed document
-  HTML_MAX_NESTING_DEPTH: 200,             // max DOM nesting depth
-  HTML_MAX_ATTRIBUTE_VALUE_BYTES: 100_000, // max single attribute value length
+  HTML_MAX_BYTES: 524_288,
+  HTML_WARN_BYTES: 409_600,
 
-  // ─── Selector limits ──────────────────────────────────────────────
-  SELECTOR_MAX_LENGTH: 500,                // max selector string length
-  SELECTOR_MAX_COMMA_PARTS: 20,            // max comma-separated selector parts
-  SELECTOR_MAX_NESTING_DEPTH: 8,           // max descendant combinator depth
-  SELECTOR_TIMEOUT_MS: 3000,               // kill selector eval after 3 seconds
-  SELECTOR_COMPLEXITY_SCORE_MAX: 100,      // computed complexity score ceiling
+  HTML_MAX_ELEMENTS: 50_000,
+  HTML_MAX_NESTING_DEPTH: 200,
+  HTML_MAX_ATTRIBUTE_VALUE_BYTES: 100_000,
 
-  // ─── Output limits ────────────────────────────────────────────────
-  RESULTS_MAX_DISPLAY: 50,                 // max match cards shown
-  RESULTS_MAX_PROCESS: 200,                // max matches to even process
-  RESULT_MAX_BYTES: 500_000,               // max size of single match output
-  PRETTY_PRINT_MAX_BYTES: 200_000,         // max input size for pretty-print
-  HIGHLIGHT_MAX_BYTES: 100_000,            // max input size for syntax highlight
-  OUTPUT_TOTAL_MAX_BYTES: 5 * 1024 * 1024, // 5MB total output cap
+  SELECTOR_MAX_LENGTH: 500,
+  SELECTOR_TIMEOUT_MS: 3000,
 
-  // ─── Rate limits ──────────────────────────────────────────────────
-  ENGINE_MIN_INTERVAL_MS: 300,             // min time between engine runs
-  ENGINE_MAX_RUNS_PER_MINUTE: 60,          // max engine invocations per minute
-  PASTE_MIN_INTERVAL_MS: 100,              // min time between paste events
+  OUTPUT_DISPLAY_MAX_CHARS: 50_000,
+  HIGHLIGHT_MAX_CHARS: 100_000,
 
-  // ─── Base URL limits ──────────────────────────────────────────────
-  BASE_URL_MAX_LENGTH: 2000,               // max base URL string length
-  BASE_URL_ALLOWED_SCHEMES: ['http', 'https'] as const,
+  PRETTY_PRINT_MAX_BYTES: 200_000,
 
-  // ─── Remove nodes limits ──────────────────────────────────────────
-  REMOVE_NODES_MAX_REMOVALS: 10_000,       // max elements to remove
+  BASE_URL_MAX_LENGTH: 2000,
+  BASE_URL_ALLOWED_SCHEMES: ["http", "https"] as const,
+
+  ATTRIBUTE_NAME_MAX_LENGTH: 100,
+
+  ENGINE_DEBOUNCE_MS: 400,
+  URL_SYNC_DEBOUNCE_MS: 500,
+  URL_STATE_MAX_CHARS: 6000,
 } as const;
-
-// ─── Types ────────────────────────────────────────────────────────────
 
 export type LimitViolation = {
   code: string;
   message: string;
-  severity: 'warn' | 'block';
-  input: 'html' | 'selector' | 'attribute' | 'removeNodes' | 'baseUrl' | 'engine';
+  severity: "warn" | "block";
+  input: "html" | "selector" | "attribute" | "stripSelectors" | "baseUrl" | "engine";
 };
 
 export type ValidationResult = {
@@ -84,9 +40,6 @@ export type ValidationResult = {
   violation?: LimitViolation;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────
-
-/** Returns human-readable size: "2.3 MB", "450 KB", "128 B" */
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;

@@ -1,7 +1,8 @@
 import type { MatchResult } from "./extractor";
+import type { ExtractionMode } from "@/types/options";
 
 export type ExportOptions = {
-  mode: "html" | "text" | "attribute";
+  mode: ExtractionMode;
   attributeName?: string;
   includeIndex: boolean;
 };
@@ -23,10 +24,13 @@ function getValue(match: MatchResult, opts: ExportOptions): string {
   switch (opts.mode) {
     case "attribute":
       return match.attribute ?? "";
-    case "text":
+    case "textContent":
       return match.text;
+    case "innerHTML":
+      return match.inner;
+    case "outerHTML":
     default:
-      return match.raw;
+      return match.outer;
   }
 }
 
@@ -34,8 +38,9 @@ export function exportAsJson(matches: MatchResult[], opts: ExportOptions): void 
   const data = matches.map((m, i) => {
     const entry: Record<string, unknown> = {};
     if (opts.includeIndex) entry.index = i;
-    if (opts.mode !== "text") entry.html = m.raw;
-    entry.text = m.text;
+    if (opts.mode === "outerHTML") entry.outerHTML = m.outer;
+    if (opts.mode === "innerHTML") entry.innerHTML = m.inner;
+    entry.textContent = m.text;
     if (opts.mode === "attribute" && opts.attributeName) {
       entry[opts.attributeName] = m.attribute ?? "";
     }
@@ -56,8 +61,9 @@ function escapeCsvValue(value: string): string {
 export function exportAsCsv(matches: MatchResult[], opts: ExportOptions): void {
   const headers: string[] = [];
   if (opts.includeIndex) headers.push("index");
-  if (opts.mode !== "text") headers.push("html");
-  headers.push("text");
+  if (opts.mode === "outerHTML") headers.push("outerHTML");
+  if (opts.mode === "innerHTML") headers.push("innerHTML");
+  headers.push("textContent");
   if (opts.mode === "attribute" && opts.attributeName) {
     headers.push(opts.attributeName);
   }
@@ -66,7 +72,8 @@ export function exportAsCsv(matches: MatchResult[], opts: ExportOptions): void {
   matches.forEach((m, i) => {
     const cells: string[] = [];
     if (opts.includeIndex) cells.push(String(i));
-    if (opts.mode !== "text") cells.push(escapeCsvValue(m.raw));
+    if (opts.mode === "outerHTML") cells.push(escapeCsvValue(m.outer));
+    if (opts.mode === "innerHTML") cells.push(escapeCsvValue(m.inner));
     cells.push(escapeCsvValue(m.text));
     if (opts.mode === "attribute" && opts.attributeName) {
       cells.push(escapeCsvValue(m.attribute ?? ""));
@@ -85,7 +92,6 @@ export function exportAsText(matches: MatchResult[], opts: ExportOptions): void 
     return prefix + value;
   });
 
-  // Use blank line separator if any entry is multiline
   const separator = lines.some((l) => l.includes("\n")) ? "\n\n" : "\n";
   const text = lines.join(separator);
   triggerDownload(text, "extraction-results.txt", "text/plain;charset=utf-8");

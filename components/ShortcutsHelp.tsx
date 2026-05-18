@@ -13,7 +13,7 @@ const shortcuts = [
   { keys: `${mod}+Shift+H`, action: "Toggle history panel" },
   { keys: `${mod}+Shift+E`, action: "Export as JSON" },
   { keys: "Escape", action: "Close panels / blur" },
-  { keys: `${mod}+1, 2, 3`, action: "Load sample 1, 2, 3" },
+  { keys: `${mod}+1 … 8`, action: "Load preset 1–8" },
 ];
 
 export default function ShortcutsHelp() {

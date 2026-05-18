@@ -35,6 +35,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Product / internal docs (do not ship)
+html-css-selector-extractor-scraper-playground.pdf
+
 # PWA generated files
 public/sw.js
 public/workbox-*.js

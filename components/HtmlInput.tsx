@@ -3,19 +3,21 @@
 import { useRef, useCallback, useMemo, useState } from "react";
 import SampleLoader from "./SampleLoader";
 import { LIMITS, formatBytes, type LimitViolation } from "@/lib/limits";
+import type { ExtractorOptions } from "@/types/options";
 
 type HtmlInputProps = {
   html: string;
   onHtmlChange: (value: string) => void;
   onClear: () => void;
   violations?: LimitViolation[];
+  onLoadPreset?: (html: string, selector: string, options: ExtractorOptions) => void;
 };
 
 /**
  * Left panel: textarea with line numbers for pasting HTML.
  * Includes sample loader dropdown, byte counter, and paste guard.
  */
-export default function HtmlInput({ html, onHtmlChange, onClear, violations }: HtmlInputProps) {
+export default function HtmlInput({ html, onHtmlChange, onClear, violations, onLoadPreset }: HtmlInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [pasteError, setPasteError] = useState<string | null>(null);
@@ -33,8 +35,8 @@ export default function HtmlInput({ html, onHtmlChange, onClear, violations }: H
 
   // Color code the byte counter
   const byteSizeColor = useMemo(() => {
-    if (byteSize > 1.5 * 1024 * 1024) return "text-red-400";
-    if (byteSize > 500 * 1024) return "text-yellow-400";
+    if (byteSize > LIMITS.HTML_MAX_BYTES) return "text-red-400";
+    if (byteSize > LIMITS.HTML_WARN_BYTES) return "text-yellow-400";
     return "text-[#777]";
   }, [byteSize]);
 
@@ -53,7 +55,7 @@ export default function HtmlInput({ html, onHtmlChange, onClear, violations }: H
 
       if (pastedBytes > LIMITS.HTML_MAX_BYTES) {
         e.preventDefault();
-        setPasteError(`Pasted content exceeds 2MB limit (${formatBytes(pastedBytes)}).`);
+        setPasteError(`Input exceeds the 512 KB limit (${formatBytes(pastedBytes)} pasted).`);
         setTimeout(() => setPasteError(null), 4000);
       } else {
         setPasteError(null);
@@ -73,7 +75,7 @@ export default function HtmlInput({ html, onHtmlChange, onClear, violations }: H
           HTML Input
         </span>
         <div className="flex items-center gap-2">
-          <SampleLoader onLoad={onHtmlChange} />
+          {onLoadPreset ? <SampleLoader onLoad={onLoadPreset} /> : null}
           <button
             onClick={onClear}
             aria-label="Clear HTML"
@@ -106,7 +108,7 @@ export default function HtmlInput({ html, onHtmlChange, onClear, violations }: H
           onChange={(e) => onHtmlChange(e.target.value)}
           onPaste={handlePaste}
           onScroll={handleScroll}
-          placeholder="Paste your HTML here..."
+          placeholder="Paste HTML here…"
           aria-label="HTML input"
           spellCheck={false}
           className="flex-1 p-3 bg-transparent text-[#e5e5e5] font-mono text-sm leading-[1.65] resize-none outline-none placeholder:text-[#444] min-h-0"
