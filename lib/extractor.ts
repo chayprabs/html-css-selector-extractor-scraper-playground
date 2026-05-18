@@ -10,7 +10,7 @@
  */
 
 import { LIMITS } from "./limits";
-import { validateParsedDocument, splitSelectorList } from "./validators";
+import { validateParsedDocument, splitSelectorList, trySelectorSyntax } from "./validators";
 import type { ExtractionMode } from "../types/options";
 
 export type ExtractorInput = {
@@ -121,6 +121,16 @@ export async function runExtractor(input: ExtractorInput): Promise<ExtractorOutp
   const sel = selector.trim();
   if (!sel) {
     return { matches: [], matchCount: 0, joinedOutput: "" };
+  }
+
+  const selectorError = trySelectorSyntax(sel);
+  if (selectorError) {
+    return {
+      matches: [],
+      matchCount: 0,
+      joinedOutput: "",
+      error: `Invalid selector: ${selectorError}`,
+    };
   }
 
   const htmlTrim = html?.trim() ?? "";

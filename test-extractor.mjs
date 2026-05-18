@@ -3,7 +3,8 @@
  */
 import { parseHTML } from "linkedom";
 
-const { DOMParser, NodeFilter } = parseHTML("<!DOCTYPE html><html><body></body></html>");
+const { document, DOMParser, NodeFilter } = parseHTML("<!DOCTYPE html><html><body></body></html>");
+globalThis.document = document;
 globalThis.DOMParser = DOMParser;
 globalThis.NodeFilter = NodeFilter;
 

@@ -21,4 +21,22 @@ describe("shareState", () => {
   it("returns null for garbage hash", () => {
     expect(decodeWorkspaceHash("#state=not-valid")).toBeNull();
   });
+
+  it("flags state over URL size guard", () => {
+    let html = "";
+    let tooLarge = false;
+    let hashFragment = "";
+    for (let i = 0; i < 20 && !tooLarge; i++) {
+      html += "<p>" + "content-".repeat(50_000) + "</p>";
+      const snap: WorkspaceSnapshot = {
+        v: 1,
+        html,
+        selector: "p",
+        options: defaultOptions,
+      };
+      ({ tooLarge, hashFragment } = encodeWorkspaceHash(snap));
+    }
+    expect(tooLarge).toBe(true);
+    expect(hashFragment).toBe("");
+  });
 });

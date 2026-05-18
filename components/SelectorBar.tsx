@@ -113,20 +113,21 @@ const SelectorBar = forwardRef<HTMLInputElement, SelectorBarProps>(function Sele
           </div>
         )}
 
-        {showCopyLink && (
+        {shareTooLarge && (
+          <span className="text-[10px] text-yellow-400 font-mono max-w-[200px] leading-tight">
+            Input is too large to encode in a URL.
+          </span>
+        )}
+
+        {showCopyLink && !shareTooLarge && (
           <button
             type="button"
             onClick={handleCopyLink}
-            disabled={shareTooLarge}
-            title={
-              shareTooLarge ? "Input is too large to encode in a URL." : "Copy shareable link with workspace state"
-            }
+            title="Copy shareable link with workspace state"
             className={`px-3 py-1.5 text-xs border rounded transition-colors whitespace-nowrap ${
-              shareTooLarge
-                ? "opacity-40 cursor-not-allowed border-[#333] text-[#555]"
-                : linkCopied
-                  ? "bg-green-950/60 text-green-400 border-green-500/30"
-                  : "bg-[#1e1e1e] text-[#888] border-[#333] hover:text-[#ccc] hover:border-[#555]"
+              linkCopied
+                ? "bg-green-950/60 text-green-400 border-green-500/30"
+                : "bg-[#1e1e1e] text-[#888] border-[#333] hover:text-[#ccc] hover:border-[#555]"
             }`}
           >
             {linkCopied ? "Link copied." : "Copy link"}

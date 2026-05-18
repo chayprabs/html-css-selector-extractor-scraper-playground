@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "icons": "node scripts/generate-icons.js",
+    "prebuild": "npm run icons",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

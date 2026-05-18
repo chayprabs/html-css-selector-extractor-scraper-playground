@@ -79,15 +79,17 @@ export default function ControlPanel({
         />
 
         <div className="border-t border-[#222] pt-3">
-          <TextInputRow
-            label="Attribute name"
-            description='Shown when mode is "attribute"'
-            placeholder="e.g. href"
-            value={options.attributeName}
-            onChange={(v) => update({ attributeName: v })}
-            maxLength={LIMITS.ATTRIBUTE_NAME_MAX_LENGTH}
-            violations={attributeViolations}
-          />
+          {options.mode === "attribute" && (
+            <TextInputRow
+              label="Attribute name"
+              description="Required for attribute mode"
+              placeholder="e.g. href"
+              value={options.attributeName}
+              onChange={(v) => update({ attributeName: v })}
+              maxLength={LIMITS.ATTRIBUTE_NAME_MAX_LENGTH}
+              violations={attributeViolations}
+            />
+          )}
 
           <TextAreaRow
             label="Strip elements first"

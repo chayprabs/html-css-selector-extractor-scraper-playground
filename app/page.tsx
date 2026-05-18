@@ -51,7 +51,7 @@ export default function Home() {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hydratedRef = useRef(false);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const selectorInputRef = useRef<HTMLInputElement>(null);
 
   const { runExtraction } = useExtractorWorker();
@@ -82,9 +82,7 @@ export default function Home() {
       setOptions(defaultPreset.options);
     }
 
-    requestAnimationFrame(() => {
-      hydratedRef.current = true;
-    });
+    setWorkspaceReady(true);
   }, []);
 
   const performExtract = useCallback(
@@ -196,7 +194,7 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!workspaceReady) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -206,10 +204,10 @@ export default function Home() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [html, selector, options, performExtract]);
+  }, [html, selector, options, performExtract, workspaceReady]);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!workspaceReady) return;
     if (typeof window === "undefined") return;
 
     if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
@@ -228,10 +226,10 @@ export default function Home() {
     return () => {
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
-  }, [html, selector, options]);
+  }, [html, selector, options, workspaceReady]);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!workspaceReady) return;
     if (processingState !== "done" || !output || output.matchCount === 0) return;
 
     addHistoryEntry({
@@ -254,6 +252,14 @@ export default function Home() {
     if (timerRef.current) clearTimeout(timerRef.current);
     void performExtract(html, selector, options);
   }, [performExtract, html, selector, options]);
+
+  /** PRD §6.1 — HTML panel Clear resets input and output only. */
+  const handleClearHtml = useCallback(() => {
+    setHtml("");
+    setOutput(null);
+    setProcessingState("idle");
+    setHtmlViolations([]);
+  }, []);
 
   const handleClearAll = useCallback(() => {
     setHtml("");
@@ -292,7 +298,7 @@ export default function Home() {
         showToast("Copied.");
       });
     },
-    clearHtml: () => setHtml(""),
+    clearHtml: handleClearHtml,
     toggleHistory: () => setHistoryOpen((prev) => !prev),
     exportJson: () => {
       if (!output || output.matches.length === 0) return;
@@ -369,7 +375,7 @@ export default function Home() {
           <HtmlInput
             html={html}
             onHtmlChange={setHtml}
-            onClear={() => setHtml("")}
+            onClear={handleClearHtml}
             violations={htmlViolations}
             onLoadPreset={handleLoadPreset}
           />

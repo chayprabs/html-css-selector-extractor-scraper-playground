@@ -102,7 +102,11 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
   };
 
   const matchLabel =
-    output && output.matchCount === 1 ? "1 match" : output ? `${output.matchCount} matches` : "";
+    output && output.matchCount === 1
+      ? "1 match found"
+      : output
+        ? `${output.matchCount} matches found`
+        : "";
 
   return (
     <div className="flex flex-col h-full bg-[#141414] rounded-lg border border-[#222] overflow-hidden">

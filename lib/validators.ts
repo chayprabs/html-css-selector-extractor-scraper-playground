@@ -20,7 +20,14 @@ export function trySelectorSyntax(selector: string): string | undefined {
   const s = selector.trim();
   if (!s) return undefined;
   try {
-    document.createDocumentFragment().querySelectorAll(s);
+    if (typeof document !== "undefined" && typeof document.createDocumentFragment === "function") {
+      document.createDocumentFragment().querySelectorAll(s);
+    } else if (typeof DOMParser !== "undefined") {
+      const probe = new DOMParser().parseFromString("<!DOCTYPE html><html><body></body></html>", "text/html");
+      probe.querySelectorAll(s);
+    } else {
+      return "Selector validation is unavailable in this environment.";
+    }
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
   }
@@ -373,7 +380,7 @@ export function validateStripSelectorsField(field: string): ValidationResult {
         valid: false,
         violation: {
           code: "STRIP_SELECTOR_INVALID",
-          message: `Invalid strip selector: ${syn}`,
+          message: `Invalid strip selector: ${part}`,
           severity: "block",
           input: "stripSelectors",
         },
