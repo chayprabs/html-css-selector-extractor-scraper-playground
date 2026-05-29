@@ -1,25 +1,27 @@
+"use client";
+
 import Link from "next/link";
-import { AUTHOR_URL, GITHUB_REPO_URL, SITE_NAME, X_URL } from "@/lib/site";
 
-const externalLinkClass = "text-[#888] hover:text-[#ccc] transition-colors";
-
+/**
+ * App header — light theme.
+ */
 export default function TopBar() {
   return (
-    <header className="shrink-0 border-b border-[#222] bg-[#0d0d0d] px-4 py-2">
-      <div className="flex items-center justify-between gap-3 max-w-[1800px] mx-auto">
-        <Link href="/" className="text-sm font-semibold text-[#e5e5e5] hover:text-white transition-colors">
-          {SITE_NAME}
+    <header className="shrink-0 border-b border-[#e5e5e5] bg-white">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <Link href="/" className="font-sans text-sm font-semibold text-[#171717] hover:text-[#7c3aed] transition-colors">
+          HTML Extractor
         </Link>
-        <nav className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono" aria-label="External links">
-          <a href={GITHUB_REPO_URL} className={externalLinkClass} target="_blank" rel="noopener noreferrer">
-            GitHub
-          </a>
-          <a href={X_URL} className={externalLinkClass} target="_blank" rel="noopener noreferrer">
-            @chayprabs
-          </a>
-          <a href={AUTHOR_URL} className={externalLinkClass} target="_blank" rel="noopener noreferrer">
-            chaitanyaprabuddha.com
-          </a>
+        <nav className="flex items-center gap-4 text-xs font-mono text-[#737373]">
+          <Link href="/privacy" className="hover:text-[#171717] transition-colors">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-[#171717] transition-colors">
+            Terms
+          </Link>
+          <Link href="/credits" className="hover:text-[#171717] transition-colors">
+            Credits
+          </Link>
         </nav>
       </div>
     </header>

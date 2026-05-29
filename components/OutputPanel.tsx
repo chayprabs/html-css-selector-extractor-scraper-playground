@@ -13,6 +13,7 @@ type OutputPanelProps = {
   output: ExtractorOutput | null;
   mode: ExtractionMode;
   processingState: ProcessingState;
+  attributeName?: string;
 };
 
 function downloadBlob(content: string, filename: string, mime: string): void {

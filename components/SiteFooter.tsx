@@ -1,21 +1,28 @@
+"use client";
+
 import Link from "next/link";
 
+/**
+ * Site footer — light theme.
+ */
 export default function SiteFooter() {
   return (
-    <footer className="shrink-0 border-t border-[#222] bg-[#0d0d0d] px-4 py-2">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 max-w-[1800px] mx-auto text-[11px] text-[#777]">
-        <p className="text-[#9ca3af]">
-          Nothing leaves your browser. HTML is parsed and queried locally. No data is sent to any server.
+    <footer className="shrink-0 border-t border-[#e5e5e5] bg-white px-4 py-4 sm:px-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[11px] font-mono text-[#a3a3a3]">
+          © {new Date().getFullYear()} Chaitanya Prabuddha — MIT License
         </p>
-        <nav className="flex flex-wrap gap-x-4 gap-y-1 font-mono" aria-label="Legal">
-          <Link href="/privacy/" className="text-[#a78bfa] hover:underline">
+        <div className="flex flex-wrap gap-4 text-xs font-mono text-[#737373]">
+          <Link href="/privacy" className="hover:text-[#171717] transition-colors">
             Privacy
           </Link>
-          <Link href="/terms/" className="text-[#a78bfa] hover:underline">
+          <Link href="/terms" className="hover:text-[#171717] transition-colors">
             Terms
           </Link>
-          <span className="text-[#555]">© {new Date().getFullYear()} Chaitanya Prabuddha — MIT License</span>
-        </nav>
+          <Link href="/credits" className="hover:text-[#171717] transition-colors">
+            Credits
+          </Link>
+        </div>
       </div>
     </footer>
   );

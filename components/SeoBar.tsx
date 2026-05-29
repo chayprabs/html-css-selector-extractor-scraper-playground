@@ -1,10 +1,18 @@
+"use client";
+
+/**
+ * Visible hero copy for SEO and first paint (client page has no server metadata body).
+ */
 export default function SeoBar() {
   return (
-    <section className="shrink-0 border-b border-[#222] bg-[#111] px-4 py-2" aria-label="About this tool">
-      <div className="max-w-[1800px] mx-auto">
-        <h1 className="text-xs font-semibold text-[#ccc]">HTML Extractor — CSS selector scraper playground</h1>
-        <p className="text-[11px] text-[#777] mt-0.5 leading-snug">
-          Paste HTML, write a CSS selector, and copy structured output. Free, client-side, and private.
+    <section className="shrink-0 border-b border-[#e5e5e5] bg-white px-4 py-4 sm:px-6">
+      <div className="mx-auto max-w-[1600px]">
+        <h1 className="font-sans text-lg font-semibold text-[#171717] sm:text-xl">
+          Extract HTML with CSS selectors
+        </h1>
+        <p className="mt-1 max-w-2xl text-sm text-[#737373] leading-relaxed">
+          Paste HTML, choose a selector, and get structured output — text, attributes, or markup. Runs entirely in your
+          browser.
         </p>
       </div>
     </section>

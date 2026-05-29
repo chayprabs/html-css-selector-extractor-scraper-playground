@@ -5,19 +5,17 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import SelectorBar from "@/components/SelectorBar";
-import HtmlInput from "@/components/HtmlInput";
-import ControlPanel from "@/components/ControlPanel";
-import OutputPanel from "@/components/OutputPanel";
-import HistoryPanel from "@/components/HistoryPanel";
-import ShortcutsHelp from "@/components/ShortcutsHelp";
 import TopBar from "@/components/TopBar";
 import SeoBar from "@/components/SeoBar";
 import SiteFooter from "@/components/SiteFooter";
+import HtmlInput from "@/components/HtmlInput";
+import ControlPanel from "@/components/ControlPanel";
+import OutputPanel from "@/components/OutputPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import type { ExtractorOutput } from "@/lib/extractor";
 import { LIMITS, type LimitViolation } from "@/lib/limits";
 import { type ExtractorOptions, defaultOptions } from "@/types/options";
+import type { ProcessingState } from "@/types/processing";
 import {
   validateHtml,
   validateSelector,
@@ -26,14 +24,21 @@ import {
   validateStripSelectorsField,
 } from "@/lib/validators";
 import { useExtractorWorker } from "@/lib/useExtractorWorker";
-import { useHistory } from "@/lib/useHistory";
+import { addHistoryEntry } from "@/lib/history";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { encodeWorkspaceHash, decodeWorkspaceHash, type WorkspaceSnapshot } from "@/lib/shareState";
 import { decodeLegacyQueryParams, mergeDecodedOptions, isWorkspaceVisiblyEmpty } from "@/lib/urlState";
 import { exportAsJson } from "@/lib/exporters";
 import { prdPresets, defaultPreset } from "@/lib/presets";
-import { clearHistory } from "@/lib/history";
-import type { ProcessingState } from "@/types/processing";
+
+function violationsForInput(violations: LimitViolation[], input: LimitViolation["input"]): LimitViolation[] {
+  return violations.filter((v) => v.input === input);
+}
+
+function hasStateHash(hash: string): boolean {
+  const raw = hash.startsWith("#") ? hash.slice(1) : hash;
+  return raw.startsWith("state=");
+}
 
 export default function Home() {
   const [html, setHtml] = useState("");
@@ -41,47 +46,57 @@ export default function Home() {
   const [options, setOptions] = useState<ExtractorOptions>(defaultOptions);
   const [output, setOutput] = useState<ExtractorOutput | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
-
-  const [htmlViolations, setHtmlViolations] = useState<LimitViolation[]>([]);
-  const [selectorViolations, setSelectorViolations] = useState<LimitViolation[]>([]);
-  const [attributeViolations, setAttributeViolations] = useState<LimitViolation[]>([]);
-  const [baseUrlViolations, setBaseUrlViolations] = useState<LimitViolation[]>([]);
-  const [stripSelectorsViolations, setStripSelectorsViolations] = useState<LimitViolation[]>([]);
+  const [violations, setViolations] = useState<LimitViolation[]>([]);
   const [shareTooLarge, setShareTooLarge] = useState(false);
-
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [shareLinkError, setShareLinkError] = useState(false);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectorInputRef = useRef<HTMLInputElement>(null);
+  const extractGenerationRef = useRef(0);
+  const userEditedRef = useRef(false);
+  const skipHistoryRef = useRef(false);
 
   const { runExtraction } = useExtractorWorker();
-  const {
-    entries: historyEntries,
-    addEntry: addHistoryEntry,
-    deleteEntry: deleteHistoryEntry,
-    clearAll: clearAllHistory,
-  } = useHistory();
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2000);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const snap = decodeWorkspaceHash(window.location.hash);
+    const hash = window.location.hash;
+    const snap = decodeWorkspaceHash(hash);
+
     if (snap) {
       setHtml(snap.html);
       setSelector(snap.selector);
       setOptions(mergeDecodedOptions(snap.options));
+      skipHistoryRef.current = true;
+    } else if (hash.length > 1 && hasStateHash(hash)) {
+      setShareLinkError(true);
+      setHtml(defaultPreset.html);
+      setSelector(defaultPreset.selector);
+      setOptions(defaultPreset.options);
+      skipHistoryRef.current = true;
     } else if (window.location.search) {
       const leg = decodeLegacyQueryParams(window.location.search);
       setSelector(leg.selector);
       setOptions(mergeDecodedOptions(leg.options));
       setHtml(defaultPreset.html);
       window.history.replaceState(null, "", window.location.pathname);
+      skipHistoryRef.current = true;
     } else {
       setHtml(defaultPreset.html);
       setSelector(defaultPreset.selector);
       setOptions(defaultPreset.options);
+      skipHistoryRef.current = true;
     }
 
     setWorkspaceReady(true);
@@ -89,27 +104,22 @@ export default function Home() {
 
   const performExtract = useCallback(
     async (h: string, s: string, opts: ExtractorOptions) => {
+      const generation = ++extractGenerationRef.current;
+      setOutput(null);
+
       if (!h.trim() && !s.trim()) {
-        setOutput(null);
+        if (generation !== extractGenerationRef.current) return;
+        setViolations([]);
         setProcessingState("idle");
-        setHtmlViolations([]);
-        setSelectorViolations([]);
-        setAttributeViolations([]);
-        setBaseUrlViolations([]);
-        setStripSelectorsViolations([]);
         return;
       }
 
       setProcessingState("validating");
 
-      const hv: LimitViolation[] = [];
-      const sv: LimitViolation[] = [];
-      const av: LimitViolation[] = [];
-      const bv: LimitViolation[] = [];
-      const rv: LimitViolation[] = [];
+      const nextViolations: LimitViolation[] = [];
 
       if (!h.trim()) {
-        hv.push({
+        nextViolations.push({
           code: "HTML_EMPTY",
           message: "Paste some HTML to get started.",
           severity: "block",
@@ -117,11 +127,11 @@ export default function Home() {
         });
       } else {
         const htmlResult = validateHtml(h);
-        if (htmlResult.violation) hv.push(htmlResult.violation);
+        if (htmlResult.violation) nextViolations.push(htmlResult.violation);
       }
 
       if (!s.trim()) {
-        sv.push({
+        nextViolations.push({
           code: "SELECTOR_EMPTY",
           message: "Enter a CSS selector.",
           severity: "block",
@@ -129,32 +139,29 @@ export default function Home() {
         });
       } else {
         const selectorResult = validateSelector(s);
-        if (selectorResult.violation) sv.push(selectorResult.violation);
+        if (selectorResult.violation) nextViolations.push(selectorResult.violation);
       }
 
       if (opts.mode === "attribute") {
         const attrResult = validateAttributeName(opts.attributeName);
-        if (attrResult.violation) av.push(attrResult.violation);
+        if (attrResult.violation) nextViolations.push(attrResult.violation);
       }
 
       if (opts.stripSelectors.trim()) {
         const stripResult = validateStripSelectorsField(opts.stripSelectors);
-        if (stripResult.violation) rv.push(stripResult.violation);
+        if (stripResult.violation) nextViolations.push(stripResult.violation);
       }
 
       if (opts.baseUrl.trim()) {
         const urlResult = validateBaseUrl(opts.baseUrl);
-        if (urlResult.violation) bv.push(urlResult.violation);
+        if (urlResult.violation) nextViolations.push(urlResult.violation);
       }
 
-      setHtmlViolations(hv);
-      setSelectorViolations(sv);
-      setAttributeViolations(av);
-      setBaseUrlViolations(bv);
-      setStripSelectorsViolations(rv);
+      if (generation !== extractGenerationRef.current) return;
 
-      const allViolations = [...hv, ...sv, ...av, ...bv, ...rv];
-      const hasBlock = allViolations.some((v) => v.severity === "block");
+      setViolations(nextViolations);
+
+      const hasBlock = nextViolations.some((v) => v.severity === "block");
       if (hasBlock) {
         setProcessingState("error");
         setOutput(null);
@@ -174,10 +181,15 @@ export default function Home() {
           prettyPrint: opts.prettyPrint,
         });
 
+        if (generation !== extractGenerationRef.current) return;
+
         setOutput(result);
         setProcessingState("done");
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        if (message === "ABORTED") return;
+        if (generation !== extractGenerationRef.current) return;
+
         if (message === "TIMEOUT") {
           setProcessingState("timeout");
           setOutput(null);
@@ -232,6 +244,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!workspaceReady) return;
+    if (skipHistoryRef.current) {
+      skipHistoryRef.current = false;
+      return;
+    }
+    if (!userEditedRef.current) return;
     if (processingState !== "done" || !output || output.matchCount === 0) return;
 
     addHistoryEntry({
@@ -240,13 +257,13 @@ export default function Home() {
       matchCount: output.matchCount,
       htmlPreview: html.slice(0, 100),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- add once per completed extraction, not on every html/selector/options edit
-  }, [processingState, output]);
+  }, [processingState, output, workspaceReady, selector, options, html]);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
 
@@ -255,42 +272,82 @@ export default function Home() {
     void performExtract(html, selector, options);
   }, [performExtract, html, selector, options]);
 
-  /** PRD §6.1 — HTML panel Clear resets input and output only. */
+  const handleHtmlChange = useCallback((value: string) => {
+    userEditedRef.current = true;
+    setHtml(value);
+  }, []);
+
+  const handleSelectorChange = useCallback((value: string) => {
+    userEditedRef.current = true;
+    setSelector(value);
+  }, []);
+
+  const handleOptionsChange = useCallback((next: ExtractorOptions) => {
+    userEditedRef.current = true;
+    setOptions(next);
+  }, []);
+
   const handleClearHtml = useCallback(() => {
+    userEditedRef.current = true;
     setHtml("");
     setOutput(null);
     setProcessingState("idle");
-    setHtmlViolations([]);
+    setViolations((prev) => prev.filter((v) => v.input !== "html"));
   }, []);
 
   const handleClearAll = useCallback(() => {
+    userEditedRef.current = true;
     setHtml("");
     setSelector("");
     setOptions(defaultOptions);
     setOutput(null);
     setProcessingState("idle");
-    setHtmlViolations([]);
-    setSelectorViolations([]);
-    setAttributeViolations([]);
-    setBaseUrlViolations([]);
-    setStripSelectorsViolations([]);
+    setViolations([]);
     setShareTooLarge(false);
+    setShareLinkError(false);
   }, []);
+
+  const handleLoadPreset = useCallback((h: string, s: string, o: ExtractorOptions) => {
+    userEditedRef.current = true;
+    setHtml(h);
+    setSelector(s);
+    setOptions(o);
+  }, []);
+
+  const handleCopyShareLink = useCallback(() => {
+    if (shareTooLarge || typeof window === "undefined") return;
+
+    const snapshot: WorkspaceSnapshot = { v: 1, html, selector, options };
+    const { hashFragment, tooLarge } = encodeWorkspaceHash(snapshot);
+
+    if (tooLarge) {
+      setShareTooLarge(true);
+      return;
+    }
+
+    const url = `${window.location.origin}${window.location.pathname}${hashFragment}`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("Link copied.");
+    });
+  }, [html, selector, options, shareTooLarge, showToast]);
 
   const matchCount = output ? output.matchCount : null;
-
   const showCopyLink = !isWorkspaceVisiblyEmpty(html, selector, options);
-
   const joinedForCopy = output?.joinedOutput ?? "";
 
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const htmlViolations = useMemo(() => violationsForInput(violations, "html"), [violations]);
+  const selectorViolations = useMemo(() => violationsForInput(violations, "selector"), [violations]);
+  const attributeViolations = useMemo(() => violationsForInput(violations, "attribute"), [violations]);
+  const baseUrlViolations = useMemo(() => violationsForInput(violations, "baseUrl"), [violations]);
+  const stripSelectorsViolations = useMemo(
+    () => violationsForInput(violations, "stripSelectors"),
+    [violations],
+  );
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 2000);
-  }, []);
+  const engineError = useMemo(() => output?.error, [output?.error]);
+  const selectorBlock = selectorViolations.find((v) => v.severity === "block");
+  const selectorWarn = selectorViolations.find((v) => v.severity === "warn");
+  const selectorHasError = !!engineError || !!selectorBlock;
 
   useKeyboardShortcuts({
     focusSelector: () => selectorInputRef.current?.focus(),
@@ -301,16 +358,18 @@ export default function Home() {
       });
     },
     clearHtml: handleClearHtml,
-    toggleHistory: () => setHistoryOpen((prev) => !prev),
+    toggleHistory: () => {},
     exportJson: () => {
       if (!output || output.matches.length === 0) return;
-      exportAsJson(output.matches, { mode: options.mode, includeIndex: true });
+      exportAsJson(output.matches, {
+        mode: options.mode,
+        includeIndex: true,
+        ...(options.mode === "attribute" && options.attributeName
+          ? { attributeName: options.attributeName }
+          : {}),
+      });
     },
     escape: () => {
-      if (historyOpen) {
-        setHistoryOpen(false);
-        return;
-      }
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
@@ -318,40 +377,19 @@ export default function Home() {
     loadSample: (index: number) => {
       if (index >= 0 && index < prdPresets.length) {
         const p = prdPresets[index]!;
-        setHtml(p.html);
-        setSelector(p.selector);
-        setOptions(p.options);
+        handleLoadPreset(p.html, p.selector, p.options);
       }
     },
   });
 
-  const handleLoadPreset = useCallback((h: string, s: string, o: ExtractorOptions) => {
-    setHtml(h);
-    setSelector(s);
-    setOptions(o);
-  }, []);
-
-  const handleLoadHistory = useCallback((entry: { selector: string; options: ExtractorOptions }) => {
-    setSelector(entry.selector);
-    setOptions(entry.options);
-    setHistoryOpen(false);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
-  const engineError = useMemo(() => {
-    if (!output?.error) return undefined;
-    return output.error;
-  }, [output?.error]);
-
   return (
-    <div className="flex flex-col h-screen bg-[#0d0d0d] overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-[#fafafa]">
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-[#7c3aed] text-white text-xs font-medium rounded-lg shadow-lg">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-xs font-medium text-[#171717] shadow-md"
+        >
           {toast}
         </div>
       )}
@@ -359,96 +397,161 @@ export default function Home() {
       <TopBar />
       <SeoBar />
 
-      <SelectorBar
-        ref={selectorInputRef}
-        selector={selector}
-        onSelectorChange={setSelector}
-        matchCount={matchCount}
-        error={engineError}
-        onClear={handleClearAll}
-        violations={selectorViolations}
-        processingState={processingState}
-        showCopyLink={showCopyLink}
-        shareTooLarge={shareTooLarge}
-        onToggleHistory={() => setHistoryOpen((prev) => !prev)}
-        historyCount={historyEntries.length}
-        onModifierEnter={flushExtract}
-      />
-
-      <div className="flex flex-1 min-h-0 flex-col lg:flex-row gap-2 p-2">
-        <div className="lg:w-[38%] h-[300px] lg:h-full shrink-0">
-          <HtmlInput
-            html={html}
-            onHtmlChange={setHtml}
-            onClear={handleClearHtml}
-            violations={htmlViolations}
-            onLoadPreset={handleLoadPreset}
-          />
-        </div>
-
-        <div className="lg:w-[22%] h-auto lg:h-full shrink-0">
-          <ControlPanel
-            options={options}
-            onOptionsChange={setOptions}
-            attributeViolations={attributeViolations}
-            stripSelectorsViolations={stripSelectorsViolations}
-            baseUrlViolations={baseUrlViolations}
-          />
-        </div>
-
-        <div className="lg:flex-1 min-h-[300px] lg:h-full flex flex-col min-w-0">
-          <ErrorBoundary
-            fallback={
-              <div className="flex flex-col items-center justify-center h-full bg-[#141414] rounded-lg border border-[#222] p-6 text-center">
-                <p className="text-sm text-[#e5e5e5] mb-3">Output panel encountered an error.</p>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="px-3 py-1.5 text-xs bg-[#7c3aed] text-white rounded hover:bg-[#6d28d9] transition-colors"
-                >
-                  Reset
-                </button>
-              </div>
-            }
+      <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 px-4 py-4 sm:px-6">
+        {shareLinkError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
           >
-            <OutputPanel output={output} mode={options.mode} processingState={processingState} />
-          </ErrorBoundary>
-        </div>
-      </div>
+            This share link could not be loaded. The workspace may be invalid or corrupted — start fresh or try another
+            link.
+          </div>
+        )}
 
-      <SiteFooter />
+        <section className="rounded-lg border border-[#e5e5e5] bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+            <div className="relative min-w-0 flex-1">
+              <label htmlFor="css-selector" className="sr-only">
+                CSS selector
+              </label>
+              <input
+                id="css-selector"
+                ref={selectorInputRef}
+                type="text"
+                value={selector}
+                onChange={(e) => handleSelectorChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    flushExtract();
+                  }
+                }}
+                maxLength={LIMITS.SELECTOR_MAX_LENGTH}
+                placeholder="CSS selector, e.g. a[href]"
+                aria-label="CSS selector"
+                spellCheck={false}
+                className={`w-full rounded border-2 bg-[#fafafa] px-4 py-3 font-mono text-sm text-[#171717] outline-none transition-colors placeholder:text-[#a3a3a3] ${
+                  selectorHasError
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-[#e5e5e5] focus:border-[#7c3aed]"
+                }`}
+              />
+              {(engineError || selectorBlock) && (
+                <p className="mt-1 font-mono text-xs text-red-600">{engineError || selectorBlock?.message}</p>
+              )}
+              {!engineError && !selectorBlock && selectorWarn && (
+                <p className="mt-1 font-mono text-xs text-amber-700">{selectorWarn.message}</p>
+              )}
+            </div>
 
-      <ErrorBoundary
-        fallback={
-          <div className="fixed top-0 right-0 h-full w-80 z-50 bg-[#141414] border-l border-[#222] flex items-center justify-center p-6 text-center">
-            <div>
-              <p className="text-sm text-[#e5e5e5] mb-3">History unavailable.</p>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {selector.length > 0 && (
+                <span className="whitespace-nowrap font-mono text-[10px] text-[#a3a3a3]">
+                  {selector.length} / {LIMITS.SELECTOR_MAX_LENGTH}
+                </span>
+              )}
+
+              {matchCount !== null && !selectorHasError && (
+                <span
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
+                    processingState === "processing"
+                      ? "animate-pulse border-[#7c3aed]/30 bg-[#7c3aed]/10 text-[#7c3aed]"
+                      : matchCount > 0
+                        ? "border-[#7c3aed]/30 bg-[#7c3aed]/10 text-[#7c3aed]"
+                        : "border-[#e5e5e5] bg-[#fafafa] text-[#737373]"
+                  }`}
+                >
+                  {processingState === "processing"
+                    ? "…"
+                    : `${matchCount} match${matchCount !== 1 ? "es" : ""}`}
+                </span>
+              )}
+
               <button
                 type="button"
-                onClick={() => {
-                  clearHistory();
-                  window.location.reload();
-                }}
-                className="px-3 py-1.5 text-xs bg-[#7c3aed] text-white rounded hover:bg-[#6d28d9] transition-colors"
+                onClick={flushExtract}
+                className="whitespace-nowrap rounded border border-[#7c3aed] bg-[#7c3aed] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#6d28d9]"
               >
-                Clear history and reset
+                Extract
+              </button>
+
+              {shareTooLarge && (
+                <span className="max-w-[200px] font-mono text-[10px] leading-tight text-amber-700">
+                  Input is too large to encode in a URL.
+                </span>
+              )}
+
+              {showCopyLink && !shareTooLarge && (
+                <button
+                  type="button"
+                  onClick={handleCopyShareLink}
+                  title="Copy shareable link with workspace state"
+                  className="whitespace-nowrap rounded border border-[#e5e5e5] bg-white px-3 py-2 text-xs text-[#525252] transition-colors hover:border-[#d4d4d4] hover:text-[#171717]"
+                >
+                  Copy link
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleClearAll}
+                aria-label="Clear all"
+                className="whitespace-nowrap rounded border border-[#e5e5e5] bg-white px-3 py-2 text-xs text-[#525252] transition-colors hover:border-[#d4d4d4] hover:text-[#171717]"
+              >
+                Clear all
               </button>
             </div>
           </div>
-        }
-        onError={() => clearHistory()}
-      >
-        <HistoryPanel
-          isOpen={historyOpen}
-          onClose={() => setHistoryOpen(false)}
-          entries={historyEntries}
-          onLoad={handleLoadHistory}
-          onDelete={deleteHistoryEntry}
-          onClear={clearAllHistory}
-        />
-      </ErrorBoundary>
+        </section>
 
-      <ShortcutsHelp />
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,38fr)_minmax(0,22fr)_minmax(0,40fr)] lg:items-stretch">
+          <div className="min-h-[300px] lg:min-h-[480px]">
+            <HtmlInput
+              html={html}
+              onHtmlChange={handleHtmlChange}
+              onClear={handleClearHtml}
+              violations={htmlViolations}
+              onLoadPreset={handleLoadPreset}
+            />
+          </div>
+
+          <div className="min-h-0">
+            <ControlPanel
+              options={options}
+              onOptionsChange={handleOptionsChange}
+              attributeViolations={attributeViolations}
+              stripSelectorsViolations={stripSelectorsViolations}
+              baseUrlViolations={baseUrlViolations}
+            />
+          </div>
+
+          <div className="flex min-h-[300px] min-w-0 flex-col lg:min-h-[480px]">
+            <ErrorBoundary
+              fallback={
+                <div className="flex h-full flex-col items-center justify-center rounded-lg border border-[#e5e5e5] bg-white p-6 text-center shadow-sm">
+                  <p className="mb-3 text-sm text-[#525252]">Output panel encountered an error.</p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="rounded bg-[#7c3aed] px-3 py-1.5 text-xs text-white transition-colors hover:bg-[#6d28d9]"
+                  >
+                    Reset
+                  </button>
+                </div>
+              }
+            >
+              <OutputPanel
+                output={output}
+                mode={options.mode}
+                processingState={processingState}
+                attributeName={options.mode === "attribute" ? options.attributeName : undefined}
+              />
+            </ErrorBoundary>
+          </div>
+        </div>
+      </main>
+
+      <SiteFooter />
     </div>
   );
 }
