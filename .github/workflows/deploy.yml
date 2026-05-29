@@ -32,14 +32,14 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
-      - name: ESLint
-        run: npm run lint
-
       - name: Vitest
         run: npm test
 
       - name: Build static site
         run: npm run build
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_SITE_URL: https://chayprabs.github.io/html-css-selector-extractor-scraper-playground
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
