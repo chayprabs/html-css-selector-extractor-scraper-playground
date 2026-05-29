@@ -11,7 +11,9 @@ import ControlPanel from "@/components/ControlPanel";
 import OutputPanel from "@/components/OutputPanel";
 import HistoryPanel from "@/components/HistoryPanel";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
-import FooterNotice from "@/components/FooterNotice";
+import TopBar from "@/components/TopBar";
+import SeoBar from "@/components/SeoBar";
+import SiteFooter from "@/components/SiteFooter";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import type { ExtractorOutput } from "@/lib/extractor";
 import { LIMITS, type LimitViolation } from "@/lib/limits";
@@ -354,6 +356,9 @@ export default function Home() {
         </div>
       )}
 
+      <TopBar />
+      <SeoBar />
+
       <SelectorBar
         ref={selectorInputRef}
         selector={selector}
@@ -411,7 +416,7 @@ export default function Home() {
         </div>
       </div>
 
-      <FooterNotice />
+      <SiteFooter />
 
       <ErrorBoundary
         fallback={

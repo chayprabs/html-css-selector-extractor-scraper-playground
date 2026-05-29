@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
+import { AUTHOR_URL, GITHUB_REPO_URL, SITE_NAME, SITE_URL, X_URL } from "@/lib/site";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,8 +17,45 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HTML Extractor — CSS selector tool for developers",
-  description: "Paste HTML, write a CSS selector, get instant structured output. Extract text, attributes, and elements from any HTML. Free and runs entirely in your browser.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — CSS selector scraper playground`,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description:
+    "Paste HTML, write a CSS selector, and copy structured output. Extract text, attributes, and elements in your browser — free, private, no server.",
+  keywords: [
+    "HTML extractor",
+    "CSS selector",
+    "web scraping",
+    "HTML parser",
+    "selector playground",
+    "scraper",
+  ],
+  authors: [{ name: "Chaitanya Prabuddha", url: AUTHOR_URL }],
+  creator: "Chaitanya Prabuddha",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — CSS selector scraper playground`,
+    description:
+      "Paste HTML, write a CSS selector, and copy structured output. Runs entirely in your browser.",
+  },
+  twitter: {
+    card: "summary",
+    title: `${SITE_NAME} — CSS selector scraper playground`,
+    description:
+      "Paste HTML, write a CSS selector, and copy structured output. Runs entirely in your browser.",
+    creator: "@chayprabs",
+  },
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
+  other: {
+    "github-repo": GITHUB_REPO_URL,
+    "author-x": X_URL,
+  },
 };
 
 export default function RootLayout({
