@@ -10,6 +10,10 @@
  * option-only changes (toggling pretty-print, text-only, etc.) skip re-parsing.
  */
 
+import { ensureWorkerDOMParser } from "./domParserPolyfill";
+
+ensureWorkerDOMParser();
+
 import { runExtractor, parseHtml, type ExtractorInput, type ExtractorOutput } from "../extractor";
 
 export type WorkerRequest = {
