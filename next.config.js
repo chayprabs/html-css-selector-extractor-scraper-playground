@@ -15,10 +15,14 @@ const withPWA = require("next-pwa")({
   ],
 });
 
+const repoBasePath =
+  process.env.GITHUB_PAGES === "true" ? "/html-css-selector-extractor-scraper-playground" : "";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "export",
   trailingSlash: true,
+  ...(repoBasePath ? { basePath: repoBasePath, assetPrefix: repoBasePath } : {}),
 };
 
 module.exports = withPWA(nextConfig);
