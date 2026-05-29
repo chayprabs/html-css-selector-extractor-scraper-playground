@@ -36,16 +36,16 @@ export default function ControlPanel({
   const prettyDisabled = !htmlModes;
 
   return (
-    <div className="flex flex-col h-full bg-[#141414] rounded-lg border border-[#222] overflow-hidden">
-      <div className="px-3 py-2 border-b border-[#222] shrink-0">
-        <span className="text-xs font-sans text-[#888] uppercase tracking-wider">
+    <div className="flex flex-col h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
+      <div className="px-3 py-2 border-b border-neutral-200 shrink-0">
+        <span className="text-xs font-sans text-neutral-500 uppercase tracking-wider">
           Options
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         <div>
-          <div className="text-xs text-[#888] mb-2">Extraction mode</div>
+          <div className="text-xs text-neutral-500 mb-2">Extraction mode</div>
           <div className="grid grid-cols-2 gap-1.5">
             {MODE_ITEMS.map((m) => (
               <button
@@ -60,8 +60,8 @@ export default function ControlPanel({
                 }
                 className={`px-2 py-1.5 rounded text-[11px] font-mono border transition-colors ${
                   options.mode === m.id
-                    ? "bg-[#7c3aed]/25 border-[#7c3aed]/60 text-[#e5e5e5]"
-                    : "bg-[#0d0d0d] border-[#333] text-[#888] hover:border-[#555]"
+                    ? "bg-blue-600/25 border-blue-300 text-neutral-800"
+                    : "bg-neutral-50 border-neutral-300 text-neutral-500 hover:border-[#555]"
                 }`}
               >
                 {m.label}
@@ -78,7 +78,7 @@ export default function ControlPanel({
           onChange={(v) => update({ prettyPrint: v })}
         />
 
-        <div className="border-t border-[#222] pt-3">
+        <div className="border-t border-neutral-200 pt-3">
           {options.mode === "attribute" && (
             <TextInputRow
               label="Attribute name"
@@ -128,13 +128,13 @@ function ToggleRow({ label, description, checked, disabled, onChange }: ToggleRo
   return (
     <label
       className={`flex items-start gap-3 p-2 rounded transition-colors ${
-        disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-[#1a1a1a] cursor-pointer"
+        disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-white cursor-pointer"
       }`}
     >
       <div className="pt-0.5 shrink-0">
         <div
           className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-            checked ? "bg-[#7c3aed] border-[#7c3aed]" : "bg-transparent border-[#444]"
+            checked ? "bg-blue-600 border-[#7c3aed]" : "bg-transparent border-[#444]"
           }`}
         >
           {checked && (
@@ -153,8 +153,8 @@ function ToggleRow({ label, description, checked, disabled, onChange }: ToggleRo
       </div>
 
       <div className="min-w-0">
-        <span className="text-sm text-[#e5e5e5]">{label}</span>
-        <div className="text-xs text-[#888] mt-0.5">{description}</div>
+        <span className="text-sm text-neutral-800">{label}</span>
+        <div className="text-xs text-neutral-500 mt-0.5">{description}</div>
       </div>
     </label>
   );
@@ -177,9 +177,9 @@ function TextInputRow({ label, description, placeholder, value, onChange, maxLen
   return (
     <label className="block p-2">
       <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-sm text-[#e5e5e5]">{label}</span>
+        <span className="text-sm text-neutral-800">{label}</span>
       </div>
-      <div className="text-xs text-[#888] mb-1.5">{description}</div>
+      <div className="text-xs text-neutral-500 mb-1.5">{description}</div>
       <input
         type="text"
         value={value}
@@ -187,8 +187,8 @@ function TextInputRow({ label, description, placeholder, value, onChange, maxLen
         placeholder={placeholder}
         spellCheck={false}
         maxLength={maxLength}
-        className={`w-full px-2.5 py-1.5 bg-[#0d0d0d] text-[#e5e5e5] font-mono text-xs rounded border transition-colors outline-none placeholder:text-[#444] ${
-          blockViolation ? "border-red-500/50 focus:border-red-500" : "border-[#333] focus:border-[#7c3aed]"
+        className={`w-full px-2.5 py-1.5 bg-neutral-50 text-neutral-800 font-mono text-xs rounded border transition-colors outline-none placeholder:text-[#444] ${
+          blockViolation ? "border-red-500/50 focus:border-red-500" : "border-neutral-300 focus:border-blue-500"
         }`}
       />
       {blockViolation && <div className="mt-1 text-[10px] text-red-400 font-mono">{blockViolation.message}</div>}
@@ -224,9 +224,9 @@ function TextAreaRow({
   return (
     <label className="block p-2">
       <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-sm text-[#e5e5e5]">{label}</span>
+        <span className="text-sm text-neutral-800">{label}</span>
       </div>
-      <div className="text-xs text-[#888] mb-1.5">{description}</div>
+      <div className="text-xs text-neutral-500 mb-1.5">{description}</div>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -234,8 +234,8 @@ function TextAreaRow({
         spellCheck={false}
         rows={3}
         maxLength={maxLength}
-        className={`w-full px-2.5 py-1.5 bg-[#0d0d0d] text-[#e5e5e5] font-mono text-xs rounded border transition-colors outline-none placeholder:text-[#444] resize-y min-h-[4rem] ${
-          blockViolation ? "border-red-500/50 focus:border-red-500" : "border-[#333] focus:border-[#7c3aed]"
+        className={`w-full px-2.5 py-1.5 bg-neutral-50 text-neutral-800 font-mono text-xs rounded border transition-colors outline-none placeholder:text-[#444] resize-y min-h-[4rem] ${
+          blockViolation ? "border-red-500/50 focus:border-red-500" : "border-neutral-300 focus:border-blue-500"
         }`}
       />
       {blockViolation && <div className="mt-1 text-[10px] text-red-400 font-mono">{blockViolation.message}</div>}

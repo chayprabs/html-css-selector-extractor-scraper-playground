@@ -6,10 +6,35 @@ import { LIMITS, type LimitViolation, type ValidationResult, formatBytes } from 
 
 /** Split strip selectors: commas or newlines (PRD §5.3). */
 export function splitSelectorList(input: string): string[] {
-  return input
-    .split(/[\n,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const results: string[] = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle;
+      current += c;
+      continue;
+    }
+    if (c === '"' && !inSingle) {
+      inDouble = !inDouble;
+      current += c;
+      continue;
+    }
+    if (!inSingle && !inDouble && (c === "," || c === "\n")) {
+      const trimmed = current.trim();
+      if (trimmed) results.push(trimmed);
+      current = "";
+      continue;
+    }
+    current += c;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) results.push(trimmed);
+  return results;
 }
 
 /**

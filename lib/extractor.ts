@@ -195,10 +195,11 @@ export async function runExtractor(input: ExtractorInput): Promise<ExtractorOutp
     return { matches: [], matchCount: 0, joinedOutput: "" };
   }
 
-  let warning: string | undefined;
+  const warnings: string[] = [];
   if (elements.some((el) => ["HTML", "HEAD", "BODY"].includes(el.tagName))) {
-    warning =
-      "Selector matched a document wrapper element (html/head/body). Results include DOMParser-generated wrappers.";
+    warnings.push(
+      "Selector matched a document wrapper element (html/head/body). Results include DOMParser-generated wrappers.",
+    );
   }
 
   const usePretty =
@@ -271,11 +272,14 @@ export async function runExtractor(input: ExtractorInput): Promise<ExtractorOutp
   }
 
   if (missingAttrCount > 0 && attrName) {
-    warning = `Attribute "${attrName}" not found on ${missingAttrCount} of ${matches.length} element${matches.length > 1 ? "s" : ""}`;
+    warnings.push(
+      `Attribute "${attrName}" not found on ${missingAttrCount} of ${matches.length} element${matches.length > 1 ? "s" : ""}`,
+    );
   }
 
   const lines = matches.map((m) => pickJoinedLine(m, mode, !!usePretty && !!htmlBeautify));
   const joinedOutput = joinLines(lines, mode);
+  const warning = warnings.length > 0 ? warnings.join(" ") : undefined;
 
   return { matches, matchCount: totalCount, joinedOutput, warning };
 }

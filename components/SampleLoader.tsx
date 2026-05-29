@@ -42,7 +42,7 @@ export default function SampleLoader({ onLoad }: SampleLoaderProps) {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="true"
-        className="px-2.5 py-1 text-xs bg-[#1e1e1e] text-[#888] border border-[#333] rounded hover:text-[#ccc] hover:border-[#555] transition-colors"
+        className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-500 border border-neutral-300 rounded hover:text-neutral-700 hover:border-[#555] transition-colors"
       >
         Presets ▾
       </button>
@@ -50,7 +50,7 @@ export default function SampleLoader({ onLoad }: SampleLoaderProps) {
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full left-0 mb-1 w-72 max-h-72 overflow-y-auto bg-[#1a1a1a] border border-[#333] rounded-lg overflow-x-hidden z-50"
+          className="absolute bottom-full left-0 mb-1 w-72 max-h-72 overflow-y-auto bg-white border border-neutral-300 rounded-lg overflow-x-hidden z-50"
         >
           {prdPresets.map((preset) => (
             <button
@@ -61,10 +61,10 @@ export default function SampleLoader({ onLoad }: SampleLoaderProps) {
                 onLoad(preset.html, preset.selector, preset.options);
                 setOpen(false);
               }}
-              className="w-full text-left px-3 py-2.5 hover:bg-[#252525] transition-colors border-b border-[#222] last:border-b-0"
+              className="w-full text-left px-3 py-2.5 hover:bg-neutral-100 transition-colors border-b border-neutral-200 last:border-b-0"
             >
-              <div className="text-sm text-[#e5e5e5]">{preset.name}</div>
-              <div className="text-xs text-[#666] mt-0.5">{preset.description}</div>
+              <div className="text-sm text-neutral-800">{preset.name}</div>
+              <div className="text-xs text-neutral-500 mt-0.5">{preset.description}</div>
             </button>
           ))}
         </div>

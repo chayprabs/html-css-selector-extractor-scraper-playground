@@ -110,15 +110,15 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
         : "";
 
   return (
-    <div className="flex flex-col h-full bg-[#141414] rounded-lg border border-[#222] overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#222] shrink-0 flex-wrap gap-2">
+    <div className="flex flex-col h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200 shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-sans text-[#888] uppercase tracking-wider">Output</span>
+          <span className="text-xs font-sans text-neutral-500 uppercase tracking-wider">Output</span>
           {processingState === "processing" && (
             <span className="text-[10px] text-[#7c3aed] font-mono animate-pulse">Processing...</span>
           )}
           {output && !output.error && processingState !== "timeout" && (
-            <span className="text-[11px] text-[#666] font-mono">{matchLabel}</span>
+            <span className="text-[11px] text-neutral-500 font-mono">{matchLabel}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -127,7 +127,7 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
               <button
                 type="button"
                 onClick={handlePrdDownload}
-                className="px-2.5 py-1 text-xs bg-[#1e1e1e] text-[#888] border border-[#333] rounded hover:text-[#ccc] hover:border-[#555] transition-colors"
+                className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-500 border border-neutral-300 rounded hover:text-neutral-700 hover:border-[#555] transition-colors"
               >
                 Download
               </button>
@@ -136,20 +136,20 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
                   type="button"
                   onClick={() => setExportOpen(!exportOpen)}
                   aria-expanded={exportOpen}
-                  className="px-2.5 py-1 text-xs bg-[#1e1e1e] text-[#888] border border-[#333] rounded hover:text-[#ccc] hover:border-[#555] transition-colors"
+                  className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-500 border border-neutral-300 rounded hover:text-neutral-700 hover:border-[#555] transition-colors"
                 >
                   Export &#x25BE;
                 </button>
                 {exportOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 top-full mt-1 w-40 bg-[#1a1a1a] border border-[#333] rounded-lg overflow-hidden z-50"
+                    className="absolute right-0 top-full mt-1 w-40 bg-white border border-neutral-300 rounded-lg overflow-hidden z-50"
                   >
                     <button
                       type="button"
                       role="menuitem"
                       onClick={() => handleExport("json")}
-                      className="w-full text-left px-3 py-2 text-xs text-[#e5e5e5] hover:bg-[#252525] border-b border-[#222]"
+                      className="w-full text-left px-3 py-2 text-xs text-neutral-800 hover:bg-neutral-100 border-b border-neutral-200"
                     >
                       JSON
                     </button>
@@ -157,7 +157,7 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
                       type="button"
                       role="menuitem"
                       onClick={() => handleExport("csv")}
-                      className="w-full text-left px-3 py-2 text-xs text-[#e5e5e5] hover:bg-[#252525] border-b border-[#222]"
+                      className="w-full text-left px-3 py-2 text-xs text-neutral-800 hover:bg-neutral-100 border-b border-neutral-200"
                     >
                       CSV
                     </button>
@@ -165,7 +165,7 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
                       type="button"
                       role="menuitem"
                       onClick={() => handleExport("txt")}
-                      className="w-full text-left px-3 py-2 text-xs text-[#e5e5e5] hover:bg-[#252525]"
+                      className="w-full text-left px-3 py-2 text-xs text-neutral-800 hover:bg-neutral-100"
                     >
                       TXT
                     </button>
@@ -194,26 +194,26 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
         {processingState === "timeout" && (
           <div className="flex flex-col items-center justify-center h-full text-center px-6 py-8">
             <p className="text-sm text-red-400 font-medium mb-2">Extraction timed out</p>
-            <p className="text-xs text-[#888]">Try a simpler selector or a smaller HTML snippet.</p>
+            <p className="text-xs text-neutral-500">Try a simpler selector or a smaller HTML snippet.</p>
           </div>
         )}
 
         {!output && processingState !== "timeout" && processingState !== "processing" && (
           <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <p className="text-sm text-[#777]">Paste HTML and enter a selector to begin.</p>
+            <p className="text-sm text-neutral-500">Paste HTML and enter a selector to begin.</p>
           </div>
         )}
 
         {processingState === "processing" && !output && (
           <div className="flex flex-col items-center justify-center h-full py-12">
             <div className="w-8 h-8 border-2 border-[#7c3aed]/30 border-t-[#7c3aed] rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[#777]">Processing...</p>
+            <p className="text-sm text-neutral-500">Processing...</p>
           </div>
         )}
 
         {output && output.matchCount === 0 && !output.error && processingState !== "timeout" && (
           <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-            <p className="text-sm text-[#777]">No elements matched this selector.</p>
+            <p className="text-sm text-neutral-500">No elements matched this selector.</p>
           </div>
         )}
 
@@ -226,11 +226,11 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
               </div>
             )}
             {displayText.length > LIMITS.HIGHLIGHT_MAX_CHARS && (
-              <div className="text-[10px] text-[#888] font-mono px-1">
+              <div className="text-[10px] text-neutral-500 font-mono px-1">
                 Syntax highlighting skipped — output over {LIMITS.HIGHLIGHT_MAX_CHARS.toLocaleString()} characters.
               </div>
             )}
-            <pre className="p-3 bg-[#111] border border-[#222] rounded-lg overflow-x-auto text-xs leading-relaxed font-mono whitespace-pre-wrap break-words">
+            <pre className="p-3 bg-neutral-50 border border-neutral-200 rounded-lg overflow-x-auto text-xs leading-relaxed font-mono whitespace-pre-wrap break-words">
               <code dangerouslySetInnerHTML={{ __html: highlighted }} />
             </pre>
           </div>

@@ -11,12 +11,12 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#0d0d0d] text-[#e5e5e5]">
+    <div className="min-h-screen flex flex-col bg-neutral-50 text-neutral-800">
       <TopBar />
       <main className="flex-1 px-4 py-12">
         <div className="max-w-2xl mx-auto space-y-6 text-sm leading-relaxed">
           <h1 className="text-xl font-semibold">Terms of Service</h1>
-          <p className="text-[#888]">Last updated: May 2026</p>
+          <p className="text-neutral-500">Last updated: May 2026</p>
 
           <section className="space-y-2">
             <h2 className="text-base font-medium text-white">Use at your own risk</h2>

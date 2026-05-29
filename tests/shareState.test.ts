@@ -22,6 +22,18 @@ describe("shareState", () => {
     expect(decodeWorkspaceHash("#state=not-valid")).toBeNull();
   });
 
+  it("rejects encoding HTML over input limit", () => {
+    const snap: WorkspaceSnapshot = {
+      v: 1,
+      html: "x".repeat(600_000),
+      selector: "p",
+      options: defaultOptions,
+    };
+    const { tooLarge, hashFragment } = encodeWorkspaceHash(snap);
+    expect(tooLarge).toBe(true);
+    expect(hashFragment).toBe("");
+  });
+
   it("flags state over URL size guard", () => {
     let html = "";
     let tooLarge = false;

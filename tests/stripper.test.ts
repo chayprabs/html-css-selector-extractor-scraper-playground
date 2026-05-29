@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { runExtractor } from "@/lib/extractor";
+import { splitSelectorList } from "@/lib/validators";
+
+describe("splitSelectorList", () => {
+  it("does not split on commas inside quoted attribute selectors", () => {
+    expect(splitSelectorList('[data-x="a,b"], p')).toEqual(['[data-x="a,b"]', "p"]);
+  });
+});
 
 describe("strip selectors (PRD §5.3)", () => {
   it("removes comma-separated strip selectors before main query", async () => {

@@ -37,7 +37,7 @@ export default function CopyButton({ text, label = "Copy", className = "" }: Cop
       className={`px-2.5 py-1 text-xs rounded transition-colors duration-150 ${
         copied
           ? "bg-green-600/20 text-green-400 border border-green-600/40"
-          : "bg-[#1e1e1e] text-[#888] border border-[#333] hover:text-[#ccc] hover:border-[#555]"
+          : "bg-neutral-100 text-neutral-500 border border-neutral-300 hover:text-neutral-700 hover:border-[#555]"
       } ${className}`}
     >
       {copied ? "Copied." : label}
