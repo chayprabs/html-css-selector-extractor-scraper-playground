@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { copyText } from "@/lib/clipboard";
 
 type CopyButtonProps = {
   text: string;
@@ -8,12 +9,9 @@ type CopyButtonProps = {
   className?: string;
 };
 
-/**
- * Reusable copy-to-clipboard button with visual feedback.
- * Shows "Copied." for 2s after successful copy (PRD §6.4).
- */
 export default function CopyButton({ text, label = "Copy", className = "" }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -22,25 +20,34 @@ export default function CopyButton({ text, label = "Copy", className = "" }: Cop
     };
   }, []);
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    });
+  const handleCopy = useCallback(async () => {
+    const ok = await copyText(text);
+    setCopied(ok);
+    setFailed(!ok);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setCopied(false);
+      setFailed(false);
+    }, 2000);
   }, [text]);
+
+  let labelText = label;
+  if (copied) labelText = "Copied.";
+  if (failed) labelText = "Failed";
 
   return (
     <button
-      onClick={handleCopy}
-      aria-live="polite"
-      className={`px-2.5 py-1 text-xs rounded transition-colors duration-150 ${
+      type="button"
+      onClick={() => void handleCopy()}
+      className={`rounded border px-2.5 py-1 text-xs transition-colors duration-150 ${
         copied
-          ? "bg-green-600/20 text-green-400 border border-green-600/40"
-          : "bg-neutral-100 text-neutral-500 border border-neutral-300 hover:text-neutral-700 hover:border-[#555]"
+          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+          : failed
+            ? "border-red-300 bg-red-50 text-red-700"
+            : "border-neutral-300 bg-neutral-50 text-neutral-700 hover:bg-neutral-100"
       } ${className}`}
     >
-      {copied ? "Copied." : label}
+      <span aria-live="polite">{labelText}</span>
     </button>
   );
 }

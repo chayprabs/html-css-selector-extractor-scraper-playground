@@ -1,19 +1,19 @@
 # HTML Extractor
 
-Extract content from any HTML using CSS selectors.
-Runs entirely in your browser — no server, no setup, no data sent anywhere.
-
-**Repository:** [github.com/chayprabs/html-css-selector-extractor-scraper-playground](https://github.com/chayprabs/html-css-selector-extractor-scraper-playground)
+Extract content from any HTML using CSS selectors. Runs entirely in your browser — no server, no setup, no data sent anywhere.
 
 ## Features
 
-- CSS selector matching with live preview
-- Extract specific attributes from matched elements
-- Text-only output mode
-- Pretty-print and format HTML output
-- Strip unwanted elements before querying
-- Rewrite relative URLs with a custom base
-- Handles broken and malformed HTML gracefully
+- CSS selector matching with sandboxed live HTML preview
+- Extract outerHTML, innerHTML, text, or a named attribute
+- Per-match and combined output views
+- Pretty-print and syntax-highlighted display (with size caps)
+- Strip elements before querying; rewrite relative URLs with a base URL
+- Shareable workspace links (URL hash), sample presets, keyboard shortcuts
+- File upload and drag-and-drop for HTML
+- PWA / offline-capable static export
+
+See [docs/PRODUCT.md](docs/PRODUCT.md) for a full product overview.
 
 ## Running locally
 
@@ -24,16 +24,21 @@ npm run dev
 
 Open http://localhost:3000
 
-Set `NEXT_PUBLIC_SITE_URL` when building for production so `robots.txt`, `sitemap.xml`, and Open Graph URLs resolve correctly.
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Development server |
+| `npm test` | Unit tests (Vitest) |
+| `npm run build` | Production static export |
+| `npm run smoke` | CLI smoke test |
 
 ## Tech
 
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
+- Next.js 14 (App Router), TypeScript, Tailwind CSS
+- Web Worker extraction engine with `linkedom` DOMParser polyfill in workers
+- Vitest + jsdom for tests
 
-## Links
+## Deploy
 
-- [GitHub](https://github.com/chayprabs/html-css-selector-extractor-scraper-playground)
-- [@chayprabs on X](https://x.com/chayprabs)
-- [chaitanyaprabuddha.com](https://chaitanyaprabuddha.com)
+GitHub Pages: enable **Pages → Build and deployment → GitHub Actions**, then push to `main`. The deploy workflow sets `GITHUB_PAGES=true` for the correct `basePath`.

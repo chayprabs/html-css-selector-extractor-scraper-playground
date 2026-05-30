@@ -195,7 +195,15 @@ export async function runExtractor(input: ExtractorInput): Promise<ExtractorOutp
     return { matches: [], matchCount: 0, joinedOutput: "" };
   }
 
+  const capped = totalCount > LIMITS.MAX_MATCHES;
+  const elementsToProcess = capped ? elements.slice(0, LIMITS.MAX_MATCHES) : elements;
+
   const warnings: string[] = [];
+  if (capped) {
+    warnings.push(
+      `Showing first ${LIMITS.MAX_MATCHES.toLocaleString()} of ${totalCount.toLocaleString()} matches. Narrow your selector for full output.`,
+    );
+  }
   if (elements.some((el) => ["HTML", "HEAD", "BODY"].includes(el.tagName))) {
     warnings.push(
       "Selector matched a document wrapper element (html/head/body). Results include DOMParser-generated wrappers.",
@@ -221,8 +229,8 @@ export async function runExtractor(input: ExtractorInput): Promise<ExtractorOutp
 
   const attrName = attributeName?.trim();
 
-  for (let i = 0; i < elements.length; i++) {
-    const el = elements[i];
+  for (let i = 0; i < elementsToProcess.length; i++) {
+    const el = elementsToProcess[i];
     const clone = el.cloneNode(true) as Element;
 
     const outer = clone.outerHTML;

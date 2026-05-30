@@ -29,6 +29,7 @@ import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { encodeWorkspaceHash, decodeWorkspaceHash, type WorkspaceSnapshot } from "@/lib/shareState";
 import { decodeLegacyQueryParams, mergeDecodedOptions, isWorkspaceVisiblyEmpty } from "@/lib/urlState";
 import { exportAsJson } from "@/lib/exporters";
+import { copyText } from "@/lib/clipboard";
 import { prdPresets, defaultPreset } from "@/lib/presets";
 
 function violationsForInput(violations: LimitViolation[], input: LimitViolation["input"]): LimitViolation[] {
@@ -326,8 +327,8 @@ export default function Home() {
     }
 
     const url = `${window.location.origin}${window.location.pathname}${hashFragment}`;
-    navigator.clipboard.writeText(url).then(() => {
-      showToast("Link copied.");
+    void copyText(url).then((ok) => {
+      showToast(ok ? "Link copied." : "Could not copy link.");
     });
   }, [html, selector, options, shareTooLarge, showToast]);
 
@@ -353,8 +354,8 @@ export default function Home() {
     focusSelector: () => selectorInputRef.current?.focus(),
     copyResults: () => {
       if (!joinedForCopy) return;
-      navigator.clipboard.writeText(joinedForCopy).then(() => {
-        showToast("Copied.");
+      void copyText(joinedForCopy).then((ok) => {
+        showToast(ok ? "Copied." : "Could not copy.");
       });
     },
     clearHtml: handleClearHtml,
@@ -512,6 +513,7 @@ export default function Home() {
               onClear={handleClearHtml}
               violations={htmlViolations}
               onLoadPreset={handleLoadPreset}
+              matchCount={matchCount}
             />
           </div>
 
@@ -545,6 +547,7 @@ export default function Home() {
                 mode={options.mode}
                 processingState={processingState}
                 attributeName={options.mode === "attribute" ? options.attributeName : undefined}
+                prettyPrint={options.prettyPrint}
               />
             </ErrorBoundary>
           </div>

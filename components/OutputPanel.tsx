@@ -2,11 +2,12 @@
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import CopyButton from "./CopyButton";
-import type { ExtractorOutput } from "@/lib/extractor";
+import type { ExtractorOutput, MatchResult } from "@/lib/extractor";
 import type { ProcessingState } from "@/types/processing";
 import type { ExtractionMode } from "@/types/options";
 import { exportAsJson, exportAsCsv, exportAsText } from "@/lib/exporters";
 import { highlightHtml, highlightText } from "@/lib/highlight";
+import { displayLineForMatch } from "@/lib/matchDisplay";
 import { LIMITS } from "@/lib/limits";
 
 type OutputPanelProps = {
@@ -14,7 +15,10 @@ type OutputPanelProps = {
   mode: ExtractionMode;
   processingState: ProcessingState;
   attributeName?: string;
+  prettyPrint?: boolean;
 };
+
+type ViewTab = "combined" | "matches";
 
 function downloadBlob(content: string, filename: string, mime: string): void {
   const blob = new Blob([content], { type: mime });
@@ -26,7 +30,7 @@ function downloadBlob(content: string, filename: string, mime: string): void {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function prdDownloadFilename(mode: ExtractionMode): { name: string; mime: string } {
@@ -36,14 +40,52 @@ function prdDownloadFilename(mode: ExtractionMode): { name: string; mime: string
   return { name: "extracted.txt", mime: "text/plain;charset=utf-8" };
 }
 
-/**
- * PRD §6.4 — combined output, truncation notice, syntax highlight cap.
- */
-export default function OutputPanel({ output, mode, processingState }: OutputPanelProps) {
+function MatchCard({
+  match,
+  line,
+  mode,
+}: {
+  match: MatchResult;
+  line: string;
+  mode: ExtractionMode;
+}) {
+  const useMarkup =
+    (mode === "outerHTML" || mode === "innerHTML") && line.length <= LIMITS.HIGHLIGHT_MAX_CHARS;
+  const highlighted = useMarkup ? highlightHtml(line) : highlightText(line);
+  const truncated = line.length > 4000;
+  const display = truncated ? line.slice(0, 4000) : line;
+
+  return (
+    <article className="animate-[fadeIn_0.2s_ease-out] rounded-lg border border-neutral-200 bg-neutral-50 p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] font-medium text-neutral-500">#{match.index + 1}</span>
+        <CopyButton text={line} label="Copy" className="!py-0.5 !text-[10px]" />
+      </div>
+      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-800">
+        <code dangerouslySetInnerHTML={{ __html: useMarkup ? highlightHtml(display) : highlightText(display) }} />
+      </pre>
+      {truncated && <p className="mt-1 text-[10px] text-neutral-500">Truncated — copy for full value.</p>}
+    </article>
+  );
+}
+
+export default function OutputPanel({
+  output,
+  mode,
+  processingState,
+  attributeName,
+  prettyPrint = false,
+}: OutputPanelProps) {
   const [exportOpen, setExportOpen] = useState(false);
+  const [viewTab, setViewTab] = useState<ViewTab>("combined");
   const exportRef = useRef<HTMLDivElement>(null);
 
   const joined = output?.joinedOutput ?? "";
+
+  const exportOpts = useMemo(
+    () => ({ mode, attributeName, includeIndex: true as const }),
+    [mode, attributeName],
+  );
 
   const { displayText, truncated, highlighted } = useMemo(() => {
     if (!joined) return { displayText: "", truncated: false, highlighted: "" };
@@ -59,6 +101,11 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
     return { displayText, truncated: trunc, highlighted };
   }, [joined, mode]);
 
+  const matchLines = useMemo(() => {
+    if (!output?.matches.length) return [];
+    return output.matches.map((m) => displayLineForMatch(m, mode, prettyPrint));
+  }, [output?.matches, mode, prettyPrint]);
+
   useEffect(() => {
     if (!exportOpen) return;
     const handler = (e: MouseEvent) => {
@@ -70,15 +117,6 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
     return () => document.removeEventListener("mousedown", handler);
   }, [exportOpen]);
 
-  useEffect(() => {
-    if (!exportOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExportOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [exportOpen]);
-
   const handlePrdDownload = () => {
     if (!joined) return;
     const { name, mime } = prdDownloadFilename(mode);
@@ -87,16 +125,15 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
 
   const handleExport = (format: "json" | "csv" | "txt") => {
     if (!output?.matches.length) return;
-    const opts = { mode, includeIndex: true as const };
     switch (format) {
       case "json":
-        exportAsJson(output.matches, opts);
+        exportAsJson(output.matches, exportOpts);
         break;
       case "csv":
-        exportAsCsv(output.matches, opts);
+        exportAsCsv(output.matches, exportOpts);
         break;
       case "txt":
-        exportAsText(output.matches, opts);
+        exportAsText(output.matches, exportOpts);
         break;
     }
     setExportOpen(false);
@@ -104,30 +141,30 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
 
   const matchLabel =
     output && output.matchCount === 1
-      ? "1 match found"
+      ? "1 match"
       : output
-        ? `${output.matchCount} matches found`
+        ? `${output.matchCount} matches`
         : "";
 
+  const hasResults = output && output.matchCount > 0 && !output.error;
+
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200 shrink-0 flex-wrap gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-sans text-neutral-500 uppercase tracking-wider">Output</span>
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wider text-neutral-500">Output</span>
           {processingState === "processing" && (
-            <span className="text-[10px] text-[#7c3aed] font-mono animate-pulse">Processing...</span>
+            <span className="animate-pulse font-mono text-[10px] text-blue-600">Processing…</span>
           )}
-          {output && !output.error && processingState !== "timeout" && (
-            <span className="text-[11px] text-neutral-500 font-mono">{matchLabel}</span>
-          )}
+          {hasResults && <span className="font-mono text-[11px] text-neutral-500">{matchLabel}</span>}
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          {output && joined.length > 0 && !output.error && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {hasResults && (
             <>
               <button
                 type="button"
                 onClick={handlePrdDownload}
-                className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-500 border border-neutral-300 rounded hover:text-neutral-700 hover:border-[#555] transition-colors"
+                className="rounded border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
               >
                 Download
               </button>
@@ -136,103 +173,117 @@ export default function OutputPanel({ output, mode, processingState }: OutputPan
                   type="button"
                   onClick={() => setExportOpen(!exportOpen)}
                   aria-expanded={exportOpen}
-                  className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-500 border border-neutral-300 rounded hover:text-neutral-700 hover:border-[#555] transition-colors"
+                  className="rounded border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
                 >
-                  Export &#x25BE;
+                  Export ▾
                 </button>
                 {exportOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 top-full mt-1 w-40 bg-white border border-neutral-300 rounded-lg overflow-hidden z-50"
+                    className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg"
                   >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleExport("json")}
-                      className="w-full text-left px-3 py-2 text-xs text-neutral-800 hover:bg-neutral-100 border-b border-neutral-200"
-                    >
+                    <button type="button" role="menuitem" onClick={() => handleExport("json")} className="w-full border-b border-neutral-100 px-3 py-2 text-left text-xs hover:bg-neutral-50">
                       JSON
                     </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleExport("csv")}
-                      className="w-full text-left px-3 py-2 text-xs text-neutral-800 hover:bg-neutral-100 border-b border-neutral-200"
-                    >
+                    <button type="button" role="menuitem" onClick={() => handleExport("csv")} className="w-full border-b border-neutral-100 px-3 py-2 text-left text-xs hover:bg-neutral-50">
                       CSV
                     </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleExport("txt")}
-                      className="w-full text-left px-3 py-2 text-xs text-neutral-800 hover:bg-neutral-100"
-                    >
+                    <button type="button" role="menuitem" onClick={() => handleExport("txt")} className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50">
                       TXT
                     </button>
                   </div>
                 )}
               </div>
-              <CopyButton text={joined} label="Copy" />
+              <CopyButton text={joined} label="Copy all" />
             </>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 min-h-0">
+      {hasResults && (
+        <div className="flex shrink-0 gap-1 border-b border-neutral-200 px-2 py-1.5" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewTab === "combined"}
+            onClick={() => setViewTab("combined")}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              viewTab === "combined" ? "bg-blue-50 text-blue-700" : "text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            Combined
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewTab === "matches"}
+            onClick={() => setViewTab("matches")}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              viewTab === "matches" ? "bg-blue-50 text-blue-700" : "text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            Per match ({output!.matches.length})
+          </button>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {output?.warning && (
-          <div className="mb-3 px-3 py-2 bg-yellow-950/40 border border-yellow-600/30 rounded text-xs text-yellow-400 font-mono">
+          <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 font-mono text-xs text-amber-800">
             {output.warning}
           </div>
         )}
 
         {output?.error && (
-          <div className="mb-3 px-3 py-2 bg-red-950/40 border border-red-500/30 rounded text-xs text-red-400 font-mono">
+          <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-xs text-red-700">
             {output.error}
           </div>
         )}
 
         {processingState === "timeout" && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6 py-8">
-            <p className="text-sm text-red-400 font-medium mb-2">Extraction timed out</p>
-            <p className="text-xs text-neutral-500">Try a simpler selector or a smaller HTML snippet.</p>
+          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm font-medium text-red-600">Extraction timed out</p>
+            <p className="mt-1 text-xs text-neutral-500">Try a simpler selector or smaller HTML.</p>
           </div>
         )}
 
         {!output && processingState !== "timeout" && processingState !== "processing" && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <p className="text-sm text-neutral-500">Paste HTML and enter a selector to begin.</p>
+          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm text-neutral-500">Results appear here after you extract.</p>
           </div>
         )}
 
         {processingState === "processing" && !output && (
-          <div className="flex flex-col items-center justify-center h-full py-12">
-            <div className="w-8 h-8 border-2 border-[#7c3aed]/30 border-t-[#7c3aed] rounded-full animate-spin mb-4" />
-            <p className="text-sm text-neutral-500">Processing...</p>
+          <div className="flex h-full flex-col items-center justify-center py-12">
+            <div className="mb-3 h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+            <p className="text-sm text-neutral-500">Processing…</p>
           </div>
         )}
 
         {output && output.matchCount === 0 && !output.error && processingState !== "timeout" && (
-          <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
             <p className="text-sm text-neutral-500">No elements matched this selector.</p>
           </div>
         )}
 
-        {output && joined.length > 0 && !output.error && processingState !== "timeout" && (
+        {hasResults && viewTab === "combined" && joined.length > 0 && (
           <div className="space-y-2">
             {truncated && (
-              <div className="text-xs text-yellow-400 font-mono px-1">
-                Output is large — showing first {LIMITS.OUTPUT_DISPLAY_MAX_CHARS.toLocaleString()} characters.
-                Download for the full result.
-              </div>
+              <p className="font-mono text-xs text-amber-700">
+                Showing first {LIMITS.OUTPUT_DISPLAY_MAX_CHARS.toLocaleString()} characters. Download for full output.
+              </p>
             )}
-            {displayText.length > LIMITS.HIGHLIGHT_MAX_CHARS && (
-              <div className="text-[10px] text-neutral-500 font-mono px-1">
-                Syntax highlighting skipped — output over {LIMITS.HIGHLIGHT_MAX_CHARS.toLocaleString()} characters.
-              </div>
-            )}
-            <pre className="p-3 bg-neutral-50 border border-neutral-200 rounded-lg overflow-x-auto text-xs leading-relaxed font-mono whitespace-pre-wrap break-words">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed">
               <code dangerouslySetInnerHTML={{ __html: highlighted }} />
             </pre>
+          </div>
+        )}
+
+        {hasResults && viewTab === "matches" && (
+          <div className="space-y-2">
+            {output!.matches.map((m, i) => (
+              <MatchCard key={m.index} match={m} line={matchLines[i] ?? ""} mode={mode} />
+            ))}
           </div>
         )}
       </div>

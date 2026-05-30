@@ -13,6 +13,9 @@ export const LIMITS = {
   SELECTOR_MAX_LENGTH: 500,
   SELECTOR_TIMEOUT_MS: 3000,
 
+  /** Max elements materialized per extraction (matchCount still reports full total). */
+  MAX_MATCHES: 2_000,
+
   OUTPUT_DISPLAY_MAX_CHARS: 50_000,
   HIGHLIGHT_MAX_CHARS: 100_000,
 
