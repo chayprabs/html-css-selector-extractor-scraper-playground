@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
+import { withBasePath } from "@/lib/basePath";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,11 +37,11 @@ export default function RootLayout({
         <meta httpEquiv="X-Frame-Options" content="DENY" />
         <meta httpEquiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
         <meta httpEquiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
-        <link rel="manifest" href={withBasePath("/manifest.json")} />
-        <link rel="icon" href={withBasePath("/favicon.ico")} sizes="any" />
-        <link rel="icon" type="image/png" sizes="32x32" href={withBasePath("/favicon-32x32.png")} />
-        <link rel="icon" type="image/png" sizes="16x16" href={withBasePath("/favicon-16x16.png")} />
-        <link rel="apple-touch-icon" href={withBasePath("/apple-touch-icon.png")} />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="theme-color" content="#7c3aed" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
