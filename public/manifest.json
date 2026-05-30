@@ -4,7 +4,7 @@
   "description": "Extract content from HTML using CSS selectors",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d0d0d",
+  "background_color": "#fafafa",
   "theme_color": "#7c3aed",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

@@ -38,5 +38,11 @@ jobs:
       - name: Next.js build
         run: npm run build
 
+      - name: Next.js build (GitHub Pages basePath)
+        run: npm run build
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_SITE_URL: https://chayprabs.github.io/html-css-selector-extractor-scraper-playground
+
       - name: Smoke test (extractor)
         run: npm run smoke
